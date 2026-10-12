@@ -30,6 +30,7 @@ jobs:
       rust_mcp: ${{ steps.filter.outputs.rust_mcp }}
       docs: ${{ steps.filter.outputs.docs }}
       release: ${{ steps.filter.outputs.release }}
+      installers: ${{ steps.filter.outputs.installers }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -72,6 +73,7 @@ jobs:
           changed rust_core 'Cargo.toml' 'Cargo.lock' 'crates/clickupc-core/**'
           changed rust_cli 'Cargo.toml' 'Cargo.lock' 'crates/clickupc/**'
           changed rust_mcp 'Cargo.toml' 'Cargo.lock' 'crates/clickupc-mcp/**'
+          changed installers 'install.sh' 'install.ps1'
           changed docs 'README.md' 'docs/**' 'crates/*/README.md' 'packaging/**'
           changed release \
             '.github/workflows/release*.yml' \
@@ -223,3 +225,29 @@ jobs:
           tar -tzf mulham28-clickupc-*.tgz | grep -q package/lib/install.js
           node --check packaging/npm/lib/install.js
           node --check packaging/npm/bin/clickupc.js
+
+  installers:
+    name: Install scripts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: changes
+    if: needs.changes.outputs.installers == 'true' || needs.changes.outputs.workflows == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: shellcheck install.sh
+        if: runner.os == 'Linux'
+        run: shellcheck install.sh
+
+      - name: Parse install.ps1
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/install.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors; exit 1 }
+          Write-Host "install.ps1 parses cleanly"
