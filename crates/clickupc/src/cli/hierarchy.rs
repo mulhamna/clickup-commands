@@ -10,6 +10,7 @@ use crate::output::{print_json, print_table};
 
 #[derive(Debug, Subcommand)]
 pub enum SpaceCmd {
+    /// List spaces in the workspace
     List {
         #[arg(long)]
         archived: bool,
@@ -18,6 +19,7 @@ pub enum SpaceCmd {
 
 #[derive(Debug, Subcommand)]
 pub enum FolderCmd {
+    /// List folders in a space
     List {
         #[arg(long)]
         space: String,
@@ -59,14 +61,11 @@ pub enum ListCmd {
 #[derive(Debug, Subcommand)]
 pub enum AliasCmd {
     /// Map a short name to a list (stored in the profile)
-    Set {
-        name: String,
-        list: String,
-    },
+    Set { name: String, list: String },
+    /// List aliases
     List,
-    Remove {
-        name: String,
-    },
+    /// Delete an alias
+    Remove { name: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -77,6 +76,7 @@ pub enum CacheCmd {
 
 #[derive(Debug, Subcommand)]
 pub enum MemberCmd {
+    /// List workspace members, or members of one list
     List {
         #[arg(long)]
         list: Option<String>,

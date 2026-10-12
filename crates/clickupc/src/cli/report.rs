@@ -22,6 +22,7 @@ pub enum DocCmd {
         #[arg(long)]
         page: Option<String>,
     },
+    /// Create a doc in the workspace or under a space, folder or list
     Create {
         #[arg(long)]
         name: String,
@@ -32,12 +33,14 @@ pub enum DocCmd {
         #[arg(long)]
         parent: Option<String>,
     },
+    /// Create or edit doc pages
     #[command(subcommand)]
     Page(PageCmd),
 }
 
 #[derive(Debug, Subcommand)]
 pub enum PageCmd {
+    /// Add a markdown page to a doc
     Create {
         doc_id: String,
         #[arg(long)]
@@ -48,6 +51,7 @@ pub enum PageCmd {
         #[arg(long)]
         parent_page: Option<String>,
     },
+    /// Replace, append to or prepend to a page's content
     Edit {
         doc_id: String,
         page_id: String,
