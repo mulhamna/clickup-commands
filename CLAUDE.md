@@ -166,7 +166,27 @@ Format: `<type>(<scope>): <description>` — in English. Scopes: `core`, `cli`, 
 | `feat!:` / `BREAKING CHANGE:`     | MAJOR |
 | `chore:`, `docs:`, `ci:`, `test:` | none  |
 
-Release automation (release-please with a **single** lane, npm/brew/winget/scoop packaging, plugin marketplace) is ROADMAP Phase 6 — adapt it from jira-commands then, not before.
+### Release flow (single lane)
+
+```
+feature PRs (conventional commits) ─► main
+        │
+        ▼  maintainer runs "release-please" (workflow_dispatch)
+release PR: VERSION, Cargo.toml (x-release-please-version), packaging/npm/package.json,
+            CHANGELOG.md, Cargo.lock (re-synced by the workflow)
+        │
+        ▼  merge release PR → release-please tags vX.Y.Z + creates the GitHub Release
+release.yml (tag push):
+  validate-tag ─► build ×6 (+ provenance) ─► github-release (archives + checksums.txt)
+                                               ├─► publish-crates  (OIDC: core → mcp → clickupc)
+                                               ├─► publish-npm     (OIDC, @mulham28/clickupc)
+                                               └─► update-packages (brew tap, scoop bucket, winget PR)
+```
+
+- Never bump versions, edit `CHANGELOG.md`, or push tags by hand; release-please owns all of it.
+- crates.io and npm publish with **OIDC trusted publishing** from the `release` environment. There are no publish tokens in secrets. Repo secrets are PATs only: `RELEASE_PLEASE_TOKEN` (tag push must trigger workflows, winget PR), `HOMEBREW_TAP_TOKEN`, `SCOOP_BUCKET_TOKEN`.
+- Every publish step is idempotent, so a failed release can be re-run from the Actions tab (`workflow_dispatch` with the tag and `dry_run: false`). `dry_run: true` builds everything and publishes nothing.
+- Don't add a second release-please package, a second `VERSION`, or a second tag pattern.
 
 ---
 
