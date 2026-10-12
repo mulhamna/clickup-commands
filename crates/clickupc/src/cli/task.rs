@@ -148,18 +148,19 @@ pub enum TaskCmd {
         #[arg(long)]
         web: bool,
     },
+    /// Create a task (prompts for list and name on a terminal)
     Create(CreateArgs),
+    /// Update fields; custom fields are set separately and reported per field
     Update(UpdateArgs),
     /// Change status (validated against the task's list)
-    Status {
-        task: String,
-        status: String,
-    },
+    Status { task: String, status: String },
+    /// Add assignees
     Assign {
         task: String,
         #[arg(required = true)]
         members: Vec<String>,
     },
+    /// Remove assignees
     Unassign {
         task: String,
         #[arg(required = true)]
@@ -182,30 +183,33 @@ pub enum TaskCmd {
         #[arg(long)]
         list: String,
     },
+    /// Remove the task from an additional list
     RemoveFrom {
         task: String,
         #[arg(long)]
         list: String,
     },
+    /// Permanently delete tasks (asks first unless --yes)
     Delete {
         #[arg(required = true)]
         tasks: Vec<String>,
     },
     /// Open in the browser
-    Open {
-        task: String,
-    },
+    Open { task: String },
+    /// Add or remove tags (tags must exist in the space)
     Tag {
         task: String,
         action: AddRemove,
         #[arg(required = true)]
         tags: Vec<String>,
     },
+    /// Link or unlink two tasks
     Link {
         task: String,
         action: AddRemove,
         other: String,
     },
+    /// Add or remove a dependency (--blocks / --waiting-on)
     Dep {
         task: String,
         action: AddRemove,
@@ -226,6 +230,7 @@ pub enum TaskCmd {
         items: Vec<String>,
     },
     #[command(subcommand)]
+    /// Apply changes or comments to every task matching a filter
     Bulk(BulkCmd),
     /// Run mixed operations from a JSON file
     Batch {

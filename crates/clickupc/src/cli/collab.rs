@@ -33,24 +33,19 @@ pub enum CommentCmd {
         #[arg(long)]
         notify_all: bool,
     },
+    /// Edit a comment's text or mark it resolved
     Update {
         comment_id: String,
         text: String,
         #[arg(long)]
         resolved: Option<bool>,
     },
-    Delete {
-        comment_id: String,
-    },
+    /// Delete a comment (asks first unless --yes)
+    Delete { comment_id: String },
     /// Reply in a comment thread
-    Reply {
-        comment_id: String,
-        text: String,
-    },
+    Reply { comment_id: String, text: String },
     /// Show replies to a comment
-    Replies {
-        comment_id: String,
-    },
+    Replies { comment_id: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -66,10 +61,8 @@ pub enum FieldCmd {
         field: String,
         value: String,
     },
-    Clear {
-        task: String,
-        field: String,
-    },
+    /// Remove a custom field value from a task
+    Clear { task: String, field: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -103,16 +96,18 @@ pub enum TimeCmd {
         #[arg(long)]
         billable: bool,
     },
+    /// Start a timer, optionally on a task
     Start {
         task: Option<String>,
         #[arg(long)]
         note: Option<String>,
     },
+    /// Stop the running timer
     Stop,
+    /// Show the running timer
     Current,
-    Delete {
-        entry_id: String,
-    },
+    /// Delete a time entry (asks first unless --yes)
+    Delete { entry_id: String },
     /// Totals grouped by task, list or day
     Report {
         #[arg(long, default_value = "mon")]

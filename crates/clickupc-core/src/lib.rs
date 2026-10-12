@@ -1,8 +1,4 @@
-//! Unofficial ClickUp API client library powering `clickupc`.
-//!
-//! Everything that talks to ClickUp lives here: config, HTTP client with
-//! rate-limit handling, typed models, task references, filters, and the
-//! name → id resolver. No printing, no CLI parsing.
+#![doc = include_str!("../README.md")]
 
 pub mod bulk;
 pub mod client;

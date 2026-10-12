@@ -59,6 +59,7 @@ enum Commands {
     Auth(AuthCmd),
     /// Current user, workspace and plan
     Whoami,
+    /// List workspaces or switch the active one
     #[command(subcommand)]
     Workspace(WorkspaceCmd),
     /// Space → Folder → List tree
@@ -68,21 +69,28 @@ enum Commands {
         #[arg(long)]
         archived: bool,
     },
+    /// List spaces
     #[command(subcommand)]
     Space(SpaceCmd),
+    /// List or create folders
     #[command(subcommand)]
     Folder(FolderCmd),
+    /// List, inspect (statuses, fields, members) or create lists
     #[command(subcommand)]
     List(ListCmd),
     /// Short names for lists
     #[command(subcommand)]
     Alias(AliasCmd),
+    /// Clear cached hierarchy, members and fields
     #[command(subcommand)]
     Cache(CacheCmd),
+    /// List or find workspace members
     #[command(subcommand)]
     Member(MemberCmd),
+    /// Search, create, update, move, bulk-edit and delete tasks
     #[command(subcommand)]
     Task(TaskCmd),
+    /// List, add, edit, reply to and delete comments
     #[command(subcommand)]
     Comment(CommentCmd),
     /// Upload files to a task
@@ -91,8 +99,10 @@ enum Commands {
         #[arg(required = true)]
         files: Vec<PathBuf>,
     },
+    /// List, set and clear custom fields
     #[command(subcommand)]
     Field(FieldCmd),
+    /// Time tracking: timers, entries and reports
     #[command(subcommand)]
     Time(TimeCmd),
     /// My tasks closed/updated since, in progress, due soon, overdue
@@ -107,6 +117,7 @@ enum Commands {
         #[arg(long)]
         list: String,
     },
+    /// Search, read, create and edit ClickUp Docs
     #[command(subcommand)]
     Doc(DocCmd),
     /// Raw API request, e.g. `clickupc api GET /v2/team`
@@ -118,6 +129,7 @@ enum Commands {
         #[arg(long)]
         data: Option<String>,
     },
+    /// Read or change profile settings
     #[command(subcommand)]
     Config(ConfigCmd),
     /// MCP server: serve, install, doctor

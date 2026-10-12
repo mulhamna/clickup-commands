@@ -35,23 +35,20 @@ pub enum AuthCmd {
 
 #[derive(Debug, Subcommand)]
 pub enum ProfileCmd {
+    /// List saved profiles
     List,
     /// Make a profile the default
-    Use {
-        name: String,
-    },
-    Remove {
-        name: String,
-    },
+    Use { name: String },
+    /// Delete a profile
+    Remove { name: String },
 }
 
 #[derive(Debug, Subcommand)]
 pub enum WorkspaceCmd {
+    /// List workspaces the token can access
     List,
     /// Set the workspace for the current profile
-    Use {
-        workspace: String,
-    },
+    Use { workspace: String },
 }
 
 #[derive(Debug, Subcommand)]

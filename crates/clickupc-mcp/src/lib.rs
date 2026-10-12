@@ -1,4 +1,4 @@
-//! MCP server for ClickUp, linked into the `clickupc` binary (`clickupc mcp serve`).
+#![doc = include_str!("../README.md")]
 
 pub mod app;
 pub mod error;
