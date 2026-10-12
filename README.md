@@ -2,7 +2,7 @@
 
 **Unofficial** ClickUp CLI and MCP server in one Rust binary. Sibling of [jira-commands](https://github.com/mulhamna/jira-commands).
 
-> Status: pre-alpha, under construction. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+> Status: pre-1.0. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 One download gives you both:
 
@@ -75,6 +75,8 @@ Your token stays in `~/.config/clickupc/config.toml` (or `CLICKUP_TOKEN`); it is
 | `CLICKUP_PROFILE` | Profile name in `config.toml` |
 | `CLICKUP_DEFAULT_LIST` | List used when `--list` is omitted |
 | `CLICKUP_TIMEOUT_SECS` | HTTP timeout |
+| `CLICKUP_TASK_LIMIT` | Default cap for list-like commands |
+| `CLICKUP_TIMEZONE` | IANA timezone for date input and display |
 
 ## Docs
 
