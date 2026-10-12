@@ -417,7 +417,7 @@ fn progress(n: usize) -> ProgressBar {
 }
 
 pub async fn run(ctx: &Ctx, cmd: TaskCmd) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     let tz = s.tz().map(str::to_string);
     let tz = tz.as_deref();

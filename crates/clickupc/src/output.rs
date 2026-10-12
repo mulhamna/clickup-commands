@@ -65,3 +65,15 @@ pub fn confirm(yes: bool, prompt: &str) -> Result<bool> {
 pub fn opt(s: Option<impl ToString>) -> String {
     s.map(|v| v.to_string()).unwrap_or_default()
 }
+
+/// Spinner on stderr while waiting on the network; hidden when not a TTY.
+pub fn spinner(msg: &str) -> indicatif::ProgressBar {
+    let pb = if std::io::stderr().is_terminal() {
+        indicatif::ProgressBar::new_spinner()
+    } else {
+        indicatif::ProgressBar::hidden()
+    };
+    pb.set_message(msg.to_string());
+    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+    pb
+}

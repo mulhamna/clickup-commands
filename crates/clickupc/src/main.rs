@@ -33,6 +33,10 @@ struct Cli {
     #[arg(long, global = true)]
     profile: Option<String>,
 
+    /// Workspace name or id for this command (overrides the profile)
+    #[arg(long, global = true)]
+    workspace: Option<String>,
+
     /// Machine-readable JSON output
     #[arg(long, global = true)]
     json: bool,
@@ -140,6 +144,7 @@ enum Commands {
 async fn run(cli: Cli) -> Result<()> {
     let ctx = Ctx {
         profile: cli.profile,
+        workspace: cli.workspace,
         json: cli.json,
         yes: cli.yes,
         refresh: cli.refresh,
@@ -159,7 +164,7 @@ async fn run(cli: Cli) -> Result<()> {
         Commands::Folder(c) => hierarchy::folder(&ctx, c).await,
         Commands::List(c) => hierarchy::list(&ctx, c).await,
         Commands::Alias(c) => hierarchy::alias(&ctx, c).await,
-        Commands::Cache(c) => hierarchy::cache(&ctx, c),
+        Commands::Cache(c) => hierarchy::cache(&ctx, c).await,
         Commands::Member(c) => hierarchy::member(&ctx, c).await,
         Commands::Task(c) => task::run(&ctx, c).await,
         Commands::Comment(c) => collab::comment(&ctx, c).await,
@@ -170,7 +175,7 @@ async fn run(cli: Cli) -> Result<()> {
         Commands::Summary { list } => report::summary(&ctx, list).await,
         Commands::Doc(c) => report::doc(&ctx, c).await,
         Commands::Api { method, path, data } => report::api(&ctx, method, path, data).await,
-        Commands::Mcp(c) => mcp::run(c).await,
+        Commands::Mcp(c) => mcp::run(&ctx, c).await,
     }
 }
 

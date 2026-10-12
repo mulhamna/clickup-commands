@@ -124,7 +124,7 @@ fn task_ref(s: &str) -> Result<TaskRef> {
 }
 
 pub async fn comment(ctx: &Ctx, cmd: CommentCmd) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let tz = s.tz();
     match cmd {
         CommentCmd::List { task, all } => {
@@ -213,7 +213,7 @@ pub async fn comment(ctx: &Ctx, cmd: CommentCmd) -> Result<()> {
 }
 
 pub async fn attach(ctx: &Ctx, task: String, files: Vec<PathBuf>) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let t = task_ref(&task)?;
     for f in &files {
         if !f.is_file() {
@@ -243,7 +243,7 @@ async fn task_list(s: &Session, t: &TaskRef) -> Result<String> {
 }
 
 pub async fn field(ctx: &Ctx, cmd: FieldCmd) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     match cmd {
         FieldCmd::List { list } => {
@@ -308,7 +308,7 @@ fn entry_row(e: &TimeEntry, tz: Option<&str>) -> Vec<String> {
 const ENTRY_HEADERS: [&str; 6] = ["ID", "Start", "Duration", "Task", "Name", "Note"];
 
 pub async fn time(ctx: &Ctx, cmd: TimeCmd) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     let tz = s.tz().map(str::to_string);
     let tz = tz.as_deref();

@@ -86,7 +86,7 @@ pub enum MemberCmd {
 }
 
 pub async fn tree(ctx: &Ctx, space: Option<String>, archived: bool) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     let mut tree = if archived {
         // Archived items are never cached; walk directly.
@@ -169,7 +169,7 @@ pub async fn tree(ctx: &Ctx, space: Option<String>, archived: bool) -> Result<()
 }
 
 pub async fn space(ctx: &Ctx, cmd: SpaceCmd) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let SpaceCmd::List { archived } = cmd;
     let spaces = s.client.spaces(archived).await?;
     if ctx.json {
@@ -189,7 +189,7 @@ pub async fn space(ctx: &Ctx, cmd: SpaceCmd) -> Result<()> {
 }
 
 pub async fn folder(ctx: &Ctx, cmd: FolderCmd) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     match cmd {
         FolderCmd::List { space } => {
@@ -219,7 +219,7 @@ pub async fn folder(ctx: &Ctx, cmd: FolderCmd) -> Result<()> {
 }
 
 pub async fn list(ctx: &Ctx, cmd: ListCmd) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     match cmd {
         ListCmd::List { space, folder } => {
@@ -326,7 +326,7 @@ pub async fn alias(ctx: &Ctx, cmd: AliasCmd) -> Result<()> {
         .unwrap_or_else(|| file.selected_profile_name());
     match cmd {
         AliasCmd::Set { name: alias, list } => {
-            let s = ctx.session()?;
+            let s = ctx.session().await?;
             let l = s.resolver()?.list(&list).await?;
             file.profile_mut(&name)
                 .aliases
@@ -359,9 +359,9 @@ pub async fn alias(ctx: &Ctx, cmd: AliasCmd) -> Result<()> {
     Ok(())
 }
 
-pub fn cache(ctx: &Ctx, cmd: CacheCmd) -> Result<()> {
+pub async fn cache(ctx: &Ctx, cmd: CacheCmd) -> Result<()> {
     let CacheCmd::Clear = cmd;
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     r.cache().clear()?;
     println!("Cleared {}.", r.cache().dir().display());
@@ -369,7 +369,7 @@ pub fn cache(ctx: &Ctx, cmd: CacheCmd) -> Result<()> {
 }
 
 pub async fn member(ctx: &Ctx, cmd: MemberCmd) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     let members = match &cmd {
         MemberCmd::List { list: Some(l) } => s.client.list_members(&r.list(l).await?.id).await?,
