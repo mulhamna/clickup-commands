@@ -76,7 +76,7 @@ irm https://raw.githubusercontent.com/mulhamna/clickup-commands/main/install.ps1
 | Cargo | `cargo install clickupc` |
 | Manual | archives on the [Releases](https://github.com/mulhamna/clickup-commands/releases) page |
 
-The install scripts and the npm package verify every download against the release's `checksums.txt`; release archives also carry [build provenance attestations](https://github.com/mulhamna/clickup-commands/attestations). Pin a version with `CLICKUPC_VERSION=v1.0.1` (sh) or `-Version v1.0.1` (PowerShell).
+The install scripts and the npm package verify every download against the release's `checksums.txt` (more options, upgrades and uninstalling: [INSTALL.md](INSTALL.md)); release archives also carry [build provenance attestations](https://github.com/mulhamna/clickup-commands/attestations). Pin a version with `CLICKUPC_VERSION=v1.0.1` (sh) or `-Version v1.0.1` (PowerShell).
 
 ## Quick start
 
@@ -271,10 +271,11 @@ Exit codes: `0` ok · `1` error · `2` invalid input · `3` auth · `4` not foun
 
 - Personal tokens are sent only in the `Authorization` header, redacted (`pk_***`) from every error and log line, and never written into MCP client configs.
 - Release binaries are built in GitHub Actions with build provenance attestations; crates.io and npm are published through OIDC trusted publishing — no long-lived publish tokens exist.
-- Found a vulnerability? Please report it privately via [GitHub Security Advisories](https://github.com/mulhamna/clickup-commands/security/advisories/new).
+- Found a vulnerability? Please report it privately — see [SECURITY.md](SECURITY.md).
 
 ## Docs
 
+- [Install guide](INSTALL.md) · [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md)
 - [CLI spec](docs/CLI.md) · [MCP tools](docs/MCP.md) · [Architecture](docs/ARCHITECTURE.md) · [ClickUp API notes](docs/CLICKUP-API.md) · [Roadmap](docs/ROADMAP.md)
 - Rust library: [`clickupc-core`](https://docs.rs/clickupc-core) (client, resolver, models) and [`clickupc-mcp`](https://docs.rs/clickupc-mcp) (embeddable MCP server)
 
