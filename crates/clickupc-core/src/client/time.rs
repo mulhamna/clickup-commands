@@ -53,7 +53,7 @@ impl ClickUpClient {
             .push_opt("folder_id", query.folder_id.as_ref())
             .push_opt("list_id", query.list_id.as_ref())
             .push_opt("is_billable", query.billable)
-            .push("include_task_tags", "false");
+            .push("include_location_names", "true");
         if !query.assignees.is_empty() {
             q = q.push("assignee", query.assignees.join(","));
         }

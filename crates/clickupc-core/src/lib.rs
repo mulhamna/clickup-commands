@@ -11,6 +11,7 @@ mod de;
 pub mod error;
 pub mod filter;
 pub mod model;
+pub mod ops;
 pub mod rate_limit;
 pub mod resolve;
 pub mod task_ref;
