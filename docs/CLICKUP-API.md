@@ -2,7 +2,7 @@
 
 Working reference for implementers. Source of truth is always <https://developer.clickup.com> (machine-readable index: <https://developer.clickup.com/llms.txt>, OpenAPI spec linked from the "OpenAPI Specification" guide).
 
-Legend: endpoints without a marker were checked against the official reference when this doc was written (Oct 2026). **(verify)** = written from memory / not checked yet; confirm against the reference before implementing, then delete the marker.
+Legend: endpoints without a marker were checked against the official reference when this doc was written (Oct 2026). = written from memory / not checked yet; confirm against the reference before implementing, then delete the marker.
 
 ---
 
@@ -32,7 +32,7 @@ Per token, per minute, depends on the plan of the workspace that hosts the token
 On exceed: HTTP `429` with headers `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (unix timestamp, seconds).
 
 Client strategy (`rate_limit.rs`):
-1. Record `X-RateLimit-Remaining` / `X-RateLimit-Reset` from **every** response (they're sent on success too — verify; if not, just rely on 429).
+1. Record `X-RateLimit-Remaining` / `X-RateLimit-Reset` from **every** response (the client records them whenever present; if a response omits them, it simply relies on 429).
 2. If `remaining == 0` and reset is in the future, sleep before sending the next request (proactive).
 3. On 429: sleep until `reset + 250..750ms jitter`, retry. Max 3 retries → `ClickUpError::RateLimit { reset_at }`.
 4. Bulk operations use a bounded concurrency (default 4) so they don't burn the 100/min budget instantly.
@@ -49,7 +49,7 @@ Surface plan-related 4xx errors with a hint ("this may require Business Plus / E
 
 ## 4. Errors
 
-- v2 error body: `{ "err": "...", "ECODE": "..." }` **(verify)**
+- v2 error body: `{ "err": "...", "ECODE": "..." }`
 - v3 error body: `{ "status": ..., "message": "...", "trace_id": "...", "timestamp": ... }`
 
 Parse both into `ClickUpError::Api { status, code: Option<String>, message, trace_id: Option<String> }`. Include `ECODE` in user-facing messages — it's what people google.
@@ -67,19 +67,19 @@ A task has one **home list** but can be added to other lists (Tasks in Multiple 
 | --- | --- |
 | Authorized user | `GET /v2/user` |
 | Authorized workspaces (+ members) | `GET /v2/team` |
-| Workspace plan | `GET /v2/team/{team_id}/plan` **(verify)** |
-| Spaces | `GET /v2/team/{team_id}/space?archived=false` **(verify)** |
-| Space | `GET /v2/space/{space_id}` **(verify)** |
-| Folders in space | `GET /v2/space/{space_id}/folder` **(verify)** |
-| Lists in folder | `GET /v2/folder/{folder_id}/list` **(verify)** |
-| Folderless lists | `GET /v2/space/{space_id}/list` **(verify)** |
-| List (incl. `statuses`) | `GET /v2/list/{list_id}` **(verify)** |
-| Create list | `POST /v2/folder/{folder_id}/list`, `POST /v2/space/{space_id}/list` **(verify)** |
-| List members | `GET /v2/list/{list_id}/member` **(verify)** |
-| Space tags | `GET /v2/space/{space_id}/tag` **(verify)** |
-| Custom task types | `GET /v2/team/{team_id}/custom_item` **(verify)** |
+| Workspace plan | `GET /v2/team/{team_id}/plan` |
+| Spaces | `GET /v2/team/{team_id}/space?archived=false` |
+| Space | `GET /v2/space/{space_id}` |
+| Folders in space | `GET /v2/space/{space_id}/folder` |
+| Lists in folder | `GET /v2/folder/{folder_id}/list` |
+| Folderless lists | `GET /v2/space/{space_id}/list` |
+| List (incl. `statuses`) | `GET /v2/list/{list_id}` |
+| Create list | `POST /v2/folder/{folder_id}/list`, `POST /v2/space/{space_id}/list` |
+| List members | `GET /v2/list/{list_id}/member` |
+| Space tags | `GET /v2/space/{space_id}/tag` |
+| Custom task types | `GET /v2/team/{team_id}/custom_item` |
 
-Hierarchy is the expensive part with a 100/min budget: one call for spaces, one per space for folders, one per folder for lists. Cache it (see ARCHITECTURE "Resolver cache").
+Hierarchy is the expensive part with a 100/min budget. Get Folders already embeds each folder's `lists`, so a full walk is 1 (spaces) + 2 per space (folders, folderless lists). Cache it (see ARCHITECTURE "Resolver cache"); numeric list ids skip the walk entirely.
 
 ## 6. Tasks
 
@@ -111,7 +111,7 @@ Shared query params:
 | `assignees[]` | user ids |
 | `tags[]` | tag names |
 | `due_date_gt/lt`, `date_created_gt/lt`, `date_updated_gt/lt`, `date_done_gt/lt` | unix ms |
-| `custom_fields` | JSON array: `[{"field_id":"…","operator":"=","value":"…"}, …]`. `=` not supported for Label fields. See the "Filter tasks using Custom Fields" and "Range operator" guides for the operator list. |
+| `custom_fields` | JSON array: `[{"field_id":"…","operator":"=","value":"…"}, …]`. Operators: `=` (contains / fuzzy), `==` (exact, text), `!=`, `!==`, `<`, `<=`, `>`, `>=`, `IS NULL`, `IS NOT NULL`, `RANGE` (value `[low, high]`), `ANY`, `ALL`, `NOT ANY`, `NOT ALL`. |
 | `parent` | parent task id → returns its subtasks (team endpoint) |
 | `include_markdown_description` | bool |
 | `custom_items[]` | task types: `0` task, `1` milestone, others workspace-defined |
@@ -152,14 +152,14 @@ Schema marks both `add` and `rem` required → always send both (empty array if 
 
 | Operation | Method + path |
 | --- | --- |
-| Delete task | `DELETE /v2/task/{task_id}` **(verify)** |
+| Delete task | `DELETE /v2/task/{task_id}` |
 | Move to new home list (v3) | `PUT /v3/workspaces/{workspace_id}/tasks/{task_id}/home_list/{list_id}` body `{ move_custom_fields?, custom_fields_to_move?, status_mappings?: [{ source_status_id, destination_status_id }] }` — `status_mappings` required if the current status doesn't exist in the target list |
-| Add to another list (TIML) | `POST /v2/list/{list_id}/task/{task_id}` **(verify)** |
-| Remove from list | `DELETE /v2/list/{list_id}/task/{task_id}` **(verify)** |
-| Merge tasks | see "Merge Tasks" reference **(verify)** |
-| Time in status | `GET /v2/task/{task_id}/time_in_status` **(verify)** |
-| Bulk time in status | `GET /v2/task/bulk_time_in_status/task_ids?task_ids=…` **(verify)** |
-| Create from template | see "Create Task From Template" **(verify)** |
+| Add to another list (TIML) | `POST /v2/list/{list_id}/task/{task_id}` |
+| Remove from list | `DELETE /v2/list/{list_id}/task/{task_id}` |
+| Merge tasks | `POST /v2/task/{task_id}/merge` body `{ source_task_ids: [...] }` |
+| Time in status | `GET /v2/task/{task_id}/time_in_status` |
+| Bulk time in status | `GET /v2/task/bulk_time_in_status/task_ids?task_ids=…` |
+| Create from template | `POST /v2/list/{list_id}/taskTemplate/{template_id}` |
 
 There's no bulk create/update endpoint in v2 → bulk = client-side loop with bounded concurrency.
 
@@ -173,10 +173,10 @@ There's no bulk create/update endpoint in v2 → bulk = client-side loop with bo
 
 | Operation | Method + path |
 | --- | --- |
-| List fields | `GET /v2/list/{list_id}/field` **(verify)** |
-| Folder / space / workspace fields | `GET /v2/folder/{id}/field`, `/v2/space/{id}/field`, `/v2/team/{id}/field` **(verify)** |
-| Set value | `POST /v2/task/{task_id}/field/{field_id}` body `{ "value": … }` (+ `value_options` for dates) **(verify)** |
-| Remove value | `DELETE /v2/task/{task_id}/field/{field_id}` **(verify)** |
+| List fields | `GET /v2/list/{list_id}/field` |
+| Folder / space / workspace fields | `GET /v2/folder/{id}/field`, `/v2/space/{id}/field`, `/v2/team/{id}/field` |
+| Set value | `POST /v2/task/{task_id}/field/{field_id}` body `{ "value": … }` (+ `value_options` for dates) |
+| Remove value | `DELETE /v2/task/{task_id}/field/{field_id}` |
 
 Both set/remove accept `custom_task_ids` + `team_id`.
 
@@ -187,11 +187,11 @@ Field object: `id` (UUID), `name`, `type` (`drop_down`, `labels`, `text`, `short
 | Operation | Method + path |
 | --- | --- |
 | Task comments | `GET /v2/task/{task_id}/comment` |
-| Create | `POST /v2/task/{task_id}/comment` body `{ comment_text, assignee?, notify_all }` **(verify body)** |
-| Update | `PUT /v2/comment/{comment_id}` **(verify)** |
-| Delete | `DELETE /v2/comment/{comment_id}` **(verify)** |
-| Threaded replies | `GET/POST /v2/comment/{comment_id}/reply` **(verify)** |
-| List comments | `GET/POST /v2/list/{list_id}/comment` **(verify)** |
+| Create | `POST /v2/task/{task_id}/comment` body `{ comment_text, assignee?, group_assignee?, notify_all }` (`comment_text` and `notify_all` required) |
+| Update | `PUT /v2/comment/{comment_id}` |
+| Delete | `DELETE /v2/comment/{comment_id}` |
+| Threaded replies | `GET/POST /v2/comment/{comment_id}/reply` |
+| List comments | `GET/POST /v2/list/{list_id}/comment` |
 
 Pagination: 25 per page newest-first. Next page: `?start={date of last comment}&start_id={id of last comment}`.
 
@@ -207,27 +207,27 @@ v3 also has generic entity attachments (Get Attachments / Create an Attachment) 
 
 | Operation | Method + path |
 | --- | --- |
-| Add tag to task | `POST /v2/task/{task_id}/tag/{tag_name}` **(verify)** |
-| Remove tag | `DELETE /v2/task/{task_id}/tag/{tag_name}` **(verify)** |
-| Add link | `POST /v2/task/{task_id}/link/{links_to}` **(verify)** |
-| Delete link | `DELETE /v2/task/{task_id}/link/{links_to}` **(verify)** |
-| Add dependency | `POST /v2/task/{task_id}/dependency` body `{ depends_on }` or `{ dependency_of }` **(verify)** |
-| Delete dependency | `DELETE /v2/task/{task_id}/dependency?depends_on=…` or `?dependency_of=…` **(verify)** |
-| Create checklist | `POST /v2/task/{task_id}/checklist` body `{ name }` **(verify)** |
-| Checklist item | `POST /v2/checklist/{checklist_id}/checklist_item`, `PUT/DELETE …/checklist_item/{item_id}` **(verify)** |
+| Add tag to task | `POST /v2/task/{task_id}/tag/{tag_name}` |
+| Remove tag | `DELETE /v2/task/{task_id}/tag/{tag_name}` |
+| Add link | `POST /v2/task/{task_id}/link/{links_to}` |
+| Delete link | `DELETE /v2/task/{task_id}/link/{links_to}` |
+| Add dependency | `POST /v2/task/{task_id}/dependency` body `{ depends_on }` or `{ dependency_of }` |
+| Delete dependency | `DELETE /v2/task/{task_id}/dependency?depends_on=…` or `?dependency_of=…` |
+| Create checklist | `POST /v2/task/{task_id}/checklist` body `{ name }` |
+| Checklist item | `POST /v2/checklist/{checklist_id}/checklist_item`, `PUT/DELETE …/checklist_item/{item_id}` |
 
-A tag must exist in the space before adding it to a task (create via Space Tags) **(verify)**.
+A tag must exist in the space before adding it to a task (create via Space Tags).
 
 ## 11. Time tracking
 
 | Operation | Method + path |
 | --- | --- |
 | Entries in range | `GET /v2/team/{team_id}/time_entries` |
-| Create entry | `POST /v2/team/{team_id}/time_entries` body `{ tid?, start, duration, description?, billable?, tags?, assignee? }` **(verify)** |
-| Start timer | `POST /v2/team/{team_id}/time_entries/start` **(verify)** |
-| Stop timer | `POST /v2/team/{team_id}/time_entries/stop` **(verify)** |
-| Running entry | `GET /v2/team/{team_id}/time_entries/current` **(verify)** |
-| Get / update / delete entry | `GET/PUT/DELETE /v2/team/{team_id}/time_entries/{timer_id}` **(verify)** |
+| Create entry | `POST /v2/team/{team_id}/time_entries` body `{ tid?, start, duration, description?, billable?, tags?, assignee? }` |
+| Start timer | `POST /v2/team/{team_id}/time_entries/start` |
+| Stop timer | `POST /v2/team/{team_id}/time_entries/stop` |
+| Running entry | `GET /v2/team/{team_id}/time_entries/current` |
+| Get / update / delete entry | `GET/PUT/DELETE /v2/team/{team_id}/time_entries/{timer_id}` |
 
 `GET time_entries` params: `start_date`, `end_date` (unix ms), `assignee` (comma-separated ids; owner/admin only), one of `space_id` / `folder_id` / `list_id` / `task_id`, `custom_task_ids` + `team_id`, `is_billable`, `include_task_tags`, `include_location_names`. Default (no dates): last 30 days, authenticated user only.
 
@@ -237,7 +237,16 @@ The legacy "tracked time" endpoints (`/v2/task/{id}/time`) exist but are depreca
 
 ## 12. Docs (v3)
 
-Endpoints under `/v3/workspaces/{workspace_id}/docs…`: Search Docs, Create a Doc, Fetch a Doc, Fetch PageListing, Fetch Pages, Create a Page, Get Page, Edit a Page. Read the "Docs API limitation" guide before implementing (import/export limits). All paths **(verify)** — implemented in Phase 5.
+| Operation | Method + path |
+| --- | --- |
+| Search docs | `GET /v3/workspaces/{ws}/docs` (filters: `id`, `creator`, `deleted`, `archived`, `parent_id`, `parent_type`, `limit`, `cursor`; **no free-text query**, so name search is client-side; response `{ docs, next_cursor }`) |
+| Create doc | `POST /v3/workspaces/{ws}/docs` body `{ name, parent?: { id, type }, visibility?, create_page? }`; parent type `4` space, `5` folder, `6` list, `7` everything, `12` workspace |
+| Fetch doc | `GET /v3/workspaces/{ws}/docs/{doc_id}` |
+| Page listing | `GET …/docs/{doc_id}/page_listing` |
+| Pages | `GET …/docs/{doc_id}/pages?content_format=text/md` |
+| Create page | `POST …/docs/{doc_id}/pages` body `{ name, content?, content_format, parent_page_id?, sub_title? }` |
+| Get page | `GET …/docs/{doc_id}/pages/{page_id}?content_format=text/md` |
+| Edit page | `PUT …/docs/{doc_id}/pages/{page_id}` body `{ name?, content?, content_edit_mode: replace\|append\|prepend, content_format }` |
 
 ## 13. Not used in v1
 
