@@ -4,6 +4,10 @@ Run: `clickupc mcp serve [--transport stdio|streamable-http] [--host 127.0.0.1] 
 
 Auth: reads the same config/profile as `clickupc` (`~/.config/clickupc/config.toml`, `CLICKUP_TOKEN`, `CLICKUP_PROFILE`, …). No OAuth.
 
+## Accounts
+
+Every tool takes two optional inputs: `profile` (a clickupc profile, i.e. a ClickUp user's token) and `workspace` (name or id). Omitted, the server's profile (`CLICKUP_PROFILE` in the client entry, else the active profile) and that profile's workspace are used. `clickup_profile_list` lists the profiles; an unknown profile fails with `config_error`. Rate limiting is tracked per token.
+
 ## Design rules
 
 1. **Names in, ids out.** Every tool accepts human names (list, status, member, field, option) *or* ids, resolved with `Resolver`. Outputs always include ids so the model can chain calls without re-resolving.
@@ -22,6 +26,7 @@ Phase tags refer to `docs/ROADMAP.md`. "Official" = equivalent exists in ClickUp
 
 | Tool | Input | Notes | Official |
 | --- | --- | --- | --- |
+| `clickup_profile_list` | — | configured profiles (name, workspace, masked token, active) | — |
 | `clickup_auth_status` | — | profile, workspace, user, token present (masked), config path | — |
 | `clickup_whoami` | — | user id, username, email, timezone, workspace id/name, plan | — |
 | `clickup_workspace_list` | — | authorized workspaces | — |

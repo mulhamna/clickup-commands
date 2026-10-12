@@ -5,7 +5,7 @@
 [![CI](https://github.com/mulhamna/clickup-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/clickup-commands/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/mulhamna/clickup-commands/blob/main/LICENSE)
 
-**ClickUp from your terminal — and from your AI agent.** One binary: a fast CLI for humans and scripts, plus an MCP server with 55 tools (`clickupc mcp serve`).
+**ClickUp from your terminal — and from your AI agent.** One binary: a fast CLI for humans and scripts, plus an MCP server with 56 tools (`clickupc mcp serve`).
 
 ```bash
 cargo install clickupc
@@ -35,7 +35,7 @@ clickupc mcp install --client claude-code   # or cursor, codex, gemini-cli, vsco
 { "mcpServers": { "clickupc": { "command": "clickupc", "args": ["mcp", "serve"] } } }
 ```
 
-55 `clickup_*` tools across tasks, bulk, comments, custom fields, relations, time, reports and docs. Inputs accept names and human dates; destructive tools require `confirm: true`; the token is read from the clickupc config and never written into client configs. Stdio by default, Streamable HTTP with `--transport streamable-http`.
+56 `clickup_*` tools across tasks, bulk, comments, custom fields, relations, time, reports and docs. Inputs accept names and human dates; destructive tools require `confirm: true`; the token is read from the clickupc config and never written into client configs. Stdio by default, Streamable HTTP with `--transport streamable-http`.
 
 ## Other ways to install
 
