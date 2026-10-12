@@ -14,6 +14,7 @@ use crate::output::{is_tty, print_json, print_table};
 #[derive(Debug, Subcommand)]
 pub enum AuthCmd {
     /// Store a personal API token (ClickUp → Settings → Apps → API Token)
+    #[command(long_about = crate::help_text::AUTH_LOGIN_LONG_ABOUT)]
     Login {
         /// pk_… token; prompted when omitted
         #[arg(long)]
@@ -23,6 +24,7 @@ pub enum AuthCmd {
         workspace: Option<String>,
     },
     /// Show profile, workspace, user and token presence
+    #[command(long_about = crate::help_text::AUTH_STATUS_LONG_ABOUT)]
     Status,
     /// Remove the stored token from the profile
     Logout,

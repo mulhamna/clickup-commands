@@ -1,4 +1,5 @@
 mod cli;
+mod help_text;
 mod output;
 
 use std::{path::PathBuf, process::ExitCode};
@@ -21,6 +22,7 @@ use cli::{
 #[command(
     name = "clickupc",
     about = "Unofficial ClickUp CLI and MCP server",
+    long_about = help_text::ROOT_LONG_ABOUT,
     version
 )]
 struct Cli {
@@ -53,7 +55,7 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Log in, check status, manage profiles
-    #[command(subcommand)]
+    #[command(subcommand, long_about = help_text::AUTH_LONG_ABOUT)]
     Auth(AuthCmd),
     /// Current user, workspace and plan
     Whoami,
@@ -119,7 +121,7 @@ enum Commands {
     #[command(subcommand)]
     Config(ConfigCmd),
     /// MCP server: serve, install, doctor
-    #[command(subcommand)]
+    #[command(subcommand, long_about = help_text::MCP_LONG_ABOUT)]
     Mcp(McpCmd),
 }
 
