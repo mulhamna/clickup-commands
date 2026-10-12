@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Write the Homebrew formula + Scoop manifest, or refresh winget manifests.
+"""Write the Homebrew formula and Scoop manifest for a release.
 
 Usage (env: VERSION, MACOS_ARM, MACOS_X86, LINUX_ARM, LINUX_X86, WIN_X86,
-WIN_ARM, RELEASE_DATE):
+WIN_ARM):
 
-    write_package_manifests.py OUT_DIR            # -> OUT_DIR/clickupc.rb, clickupc.json
-    write_package_manifests.py --winget DIR       # patch DIR/clickupc*.yaml in place
+    write_package_manifests.py OUT_DIR    # -> OUT_DIR/clickupc.rb, clickupc.json
 """
 
 import json
@@ -89,41 +88,11 @@ def scoop(e: dict) -> str:
     return json.dumps(manifest, indent=2) + "\n"
 
 
-def sub_once(pattern: str, repl: str, text: str, path: Path) -> str:
-    out, n = re.subn(pattern, repl, text, count=1, flags=re.MULTILINE)
-    if n != 1:
-        raise SystemExit(f"{path}: expected one match for {pattern!r}")
-    return out
-
-
-def winget(directory: Path, e: dict) -> None:
-    v = e["VERSION"]
-    for path in sorted(directory.glob("clickupc*.yaml")):
-        text = sub_once(r"^PackageVersion: .*$", f"PackageVersion: {v}", path.read_text(), path)
-        if path.name.endswith(".installer.yaml"):
-            text = sub_once(r"^ReleaseDate: .*$", f"ReleaseDate: {e['RELEASE_DATE']}", text, path)
-            for asset, sha in [
-                ("clickupc-windows-x86_64.zip", e["WIN_X86"]),
-                ("clickupc-windows-aarch64.zip", e["WIN_ARM"]),
-            ]:
-                text = sub_once(
-                    rf"^(\s+InstallerUrl: ).*/{re.escape(asset)}\n(\s+InstallerSha256: ).*$",
-                    rf"\g<1>{url(v, asset)}\n\g<2>{sha}",
-                    text,
-                    path,
-                )
-        path.write_text(text)
-        print(f"updated {path}")
-
-
 def main() -> None:
     e = dict(os.environ)
     missing = [k for k in ("VERSION",) if not e.get(k)]
     if missing:
         raise SystemExit(f"missing env: {missing}")
-    if len(sys.argv) == 3 and sys.argv[1] == "--winget":
-        winget(Path(sys.argv[2]), e)
-        return
     if len(sys.argv) != 2:
         raise SystemExit(__doc__)
     for key in ("MACOS_ARM", "MACOS_X86", "LINUX_ARM", "LINUX_X86", "WIN_X86", "WIN_ARM"):

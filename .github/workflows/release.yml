@@ -11,7 +11,6 @@ name: Release
 #   - npmjs.com → @mulham28/clickupc → Settings → Trusted Publisher: GitHub
 #     Actions, same repo / workflow / environment.
 #   - Secrets (PATs, not publish tokens):
-#       RELEASE_PLEASE_TOKEN  this repo: contents, pull requests, issues (RW)
 #       PACKAGES_TOKEN        mulhamna/homebrew-tap + mulhamna/scoop-bucket: contents (RW)
 #
 # `workflow_dispatch` with dry_run=true builds every artifact and publishes
@@ -267,9 +266,9 @@ jobs:
             npm publish ./packaging/npm --access public --provenance
           fi
 
-  # ── 5. Homebrew tap, Scoop bucket, winget source manifests ──────────────
+  # ── 5. Homebrew tap + Scoop bucket ──────────────────────────────────────
   update-packages:
-    name: Homebrew / Scoop / winget
+    name: Homebrew / Scoop
     needs: github-release
     if: ${{ github.event_name == 'push' || !inputs.dry_run }}
     runs-on: ubuntu-latest
@@ -279,8 +278,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          ref: ${{ env.TAG }}
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -293,7 +291,6 @@ jobs:
           sha() { awk -v f="$1" '$2 == f { print $1 }' checksums.txt; }
           {
             echo "version=${TAG#v}"
-            echo "date=$(date -u +%F)"
             echo "macos_arm=$(sha clickupc-macos-aarch64.tar.gz)"
             echo "macos_x86=$(sha clickupc-macos-x86_64.tar.gz)"
             echo "linux_arm=$(sha clickupc-linux-aarch64.tar.gz)"
@@ -344,31 +341,3 @@ jobs:
           git diff --staged --quiet && { echo "manifest unchanged"; exit 0; }
           git commit -m "clickupc: update to ${VERSION}"
           git push
-
-      - name: Refresh winget source manifests
-        env:
-          VERSION: ${{ steps.v.outputs.version }}
-          RELEASE_DATE: ${{ steps.v.outputs.date }}
-          WIN_X86: ${{ steps.v.outputs.win_x86 }}
-          WIN_ARM: ${{ steps.v.outputs.win_arm }}
-        run: python3 .github/scripts/write_package_manifests.py --winget packaging/winget
-
-      - name: Open winget manifest PR
-        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
-        with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          commit-message: "chore(packaging): refresh winget manifests for v${{ steps.v.outputs.version }}"
-          branch: chore/winget-v${{ steps.v.outputs.version }}
-          delete-branch: true
-          title: "chore(packaging): refresh winget manifests for v${{ steps.v.outputs.version }}"
-          body: |
-            ## Summary
-
-            - Point the winget source manifests at the v${{ steps.v.outputs.version }} release archives and their SHA-256 hashes.
-
-            ## Test plan
-
-            - [ ] `winget validate packaging/winget`
-            - [ ] Submit to microsoft/winget-pkgs after merge
-          add-paths: |
-            packaging/winget/*.yaml
