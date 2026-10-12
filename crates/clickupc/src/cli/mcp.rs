@@ -34,8 +34,9 @@ pub enum McpCmd {
     Install {
         #[arg(long, value_enum)]
         client: Option<McpClient>,
-        /// Server entry name
-        #[arg(long, default_value = "clickup")]
+        /// Server entry name. Defaults to `clickupc` so it never collides
+        /// with ClickUp's official server, which clients usually call `clickup`.
+        #[arg(long, default_value = "clickupc")]
         name: String,
         /// Binary to register (default: clickupc on PATH)
         #[arg(long, default_value = "clickupc")]
@@ -393,7 +394,7 @@ mod tests {
 
     #[test]
     fn spec_runs_mcp_serve_without_token() {
-        let spec = server_spec("clickup", "/usr/local/bin/clickupc".into(), Some("work"));
+        let spec = server_spec("clickupc", "/usr/local/bin/clickupc".into(), Some("work"));
         assert_eq!(spec.command.as_deref(), Some("/usr/local/bin/clickupc"));
         assert_eq!(spec.args, vec!["mcp", "serve"]);
         assert_eq!(spec.transport, kurir::Transport::Stdio);
@@ -404,6 +405,21 @@ mod tests {
         let json = serde_json::to_string(&snippet_for(&spec)).unwrap();
         assert!(!json.contains("pk_"));
         assert!(!json.contains("CLICKUP_TOKEN"));
+    }
+
+    #[test]
+    fn default_entry_name_does_not_clash_with_official_server() {
+        use clap::Parser;
+        #[derive(Parser)]
+        struct T {
+            #[command(subcommand)]
+            cmd: McpCmd,
+        }
+        let t = T::try_parse_from(["t", "install", "--client", "generic-json"]).unwrap();
+        match t.cmd {
+            McpCmd::Install { name, .. } => assert_eq!(name, "clickupc"),
+            _ => unreachable!(),
+        }
     }
 
     #[test]
