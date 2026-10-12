@@ -551,3 +551,22 @@ async fn raw_request_substitutes_workspace() {
         .unwrap();
     assert_eq!(v, json!({ "spaces": [] }));
 }
+
+#[tokio::test]
+async fn find_workspace_by_name_or_id() {
+    let server = MockServer::start().await;
+    Mock::given(path("/v2/team"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "teams": [
+            { "id": "111", "name": "Acme" },
+            { "id": "222", "name": "Side Project" }
+        ]})))
+        .mount(&server)
+        .await;
+    let c = client(&server);
+    assert_eq!(c.find_workspace("side project").await.unwrap().id, "222");
+    assert_eq!(c.find_workspace("111").await.unwrap().name, "Acme");
+    match c.find_workspace("Sde Projct").await.unwrap_err() {
+        ClickUpError::Resolve { suggestions, .. } => assert_eq!(suggestions[0], "Side Project"),
+        e => panic!("{e:?}"),
+    }
+}

@@ -99,6 +99,24 @@ impl ConfigFile {
     }
 }
 
+/// `"Acme Corp (EU)"` → `"acme-corp-eu"`, for suggesting profile names.
+pub fn profile_slug(name: &str) -> String {
+    let mut out = String::new();
+    for c in name.trim().chars() {
+        if c.is_ascii_alphanumeric() {
+            out.push(c.to_ascii_lowercase());
+        } else if !out.ends_with('-') && !out.is_empty() {
+            out.push('-');
+        }
+    }
+    let out = out.trim_end_matches('-').to_string();
+    if out.is_empty() {
+        DEFAULT_PROFILE.to_string()
+    } else {
+        out
+    }
+}
+
 #[cfg(unix)]
 fn restrict_permissions(path: &std::path::Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
@@ -339,6 +357,13 @@ mod tests {
         let cfg = ClickUpConfig::load().unwrap();
         assert!(matches!(cfg.token(), Err(ClickUpError::Auth(_))));
         assert!(matches!(cfg.workspace_id(), Err(ClickUpError::Config(_))));
+    }
+
+    #[test]
+    fn slugs() {
+        assert_eq!(profile_slug("Acme Corp (EU)"), "acme-corp-eu");
+        assert_eq!(profile_slug("  Side Project  "), "side-project");
+        assert_eq!(profile_slug("!!!"), "default");
     }
 
     #[test]
