@@ -23,13 +23,18 @@ Rate limits are handled automatically: on HTTP 429 the client waits until `X-Rat
 
 ## Install
 
-> Coming with the first release. Every channel installs the same single binary.
+Every channel installs the same single binary.
 
 ```bash
-npm i -g @mulham28/clickupc        # npm
-cargo install clickupc             # crates.io
-# brew / scoop / winget / install.sh — planned
+npm i -g @mulham28/clickupc              # npm
+cargo install clickupc                   # crates.io
+brew install mulhamna/tap/clickupc       # Homebrew (macOS / Linux)
+scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
+scoop install mulhamna/clickupc          # Scoop (Windows)
+winget install mulhamna.clickupc         # winget (once accepted into winget-pkgs)
 ```
+
+Prebuilt archives for Linux, macOS and Windows (x86_64 + aarch64) are on the [Releases](https://github.com/mulhamna/clickup-commands/releases) page with a `checksums.txt` and build provenance attestations.
 
 ## Quick start
 
