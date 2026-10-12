@@ -33,10 +33,11 @@ pub struct User {
 }
 
 impl User {
+    /// Username, falling back to the id; never the email.
     pub fn display(&self) -> String {
         self.username
             .clone()
-            .or_else(|| self.email.clone())
+            .filter(|u| !u.is_empty())
             .unwrap_or_else(|| self.id.clone())
     }
 }
