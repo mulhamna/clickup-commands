@@ -194,7 +194,7 @@ Or add it by hand:
 ```json
 {
   "mcpServers": {
-    "clickup": { "command": "clickupc", "args": ["mcp", "serve"] }
+    "clickupc": { "command": "clickupc", "args": ["mcp", "serve"] }
   }
 }
 ```
@@ -212,7 +212,7 @@ Or add it by hand:
 | Docs | `doc_search`, `doc_get`, `doc_pages`, `doc_create`, `doc_page_create`, `doc_page_update` |
 | Escape hatch | `api_request` |
 
-All tool names are prefixed `clickup_`. Inputs take names or ids and human dates; task results are compact by default (`detail: "full"` for everything) so they don't flood the model's context. Destructive tools fail with `unsafe_operation` unless `confirm: true`, and errors carry stable codes (`resolve_error` with suggestions, `clickup_api_error` with the ClickUp `ECODE`, `rate_limited` with the reset time). Details: [docs/MCP.md](docs/MCP.md).
+The entry is named `clickupc`, so it sits next to ClickUp's official server (usually registered as `clickup`) without clashing; pick another name with `--name`. All tool names are prefixed `clickup_`. Inputs take names or ids and human dates; task results are compact by default (`detail: "full"` for everything) so they don't flood the model's context. Destructive tools fail with `unsafe_operation` unless `confirm: true`, and errors carry stable codes (`resolve_error` with suggestions, `clickup_api_error` with the ClickUp `ECODE`, `rate_limited` with the reset time). Details: [docs/MCP.md](docs/MCP.md).
 
 ## Configuration
 

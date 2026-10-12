@@ -33,7 +33,7 @@ clickupc standup
 ```json
 {
   "mcpServers": {
-    "clickup": { "command": "clickupc", "args": ["mcp", "serve"] }
+    "clickupc": { "command": "clickupc", "args": ["mcp", "serve"] }
   }
 }
 ```
@@ -43,7 +43,7 @@ Or skip `-g` and let the client fetch it:
 ```json
 {
   "mcpServers": {
-    "clickup": { "command": "npx", "args": ["-y", "@mulham28/clickupc", "mcp", "serve"] }
+    "clickupc": { "command": "npx", "args": ["-y", "@mulham28/clickupc", "mcp", "serve"] }
   }
 }
 ```
