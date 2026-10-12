@@ -41,7 +41,6 @@ cargo install clickupc                   # crates.io
 brew install mulhamna/tap/clickupc       # Homebrew (macOS / Linux)
 scoop bucket add mulhamna https://github.com/mulhamna/scoop-bucket
 scoop install mulhamna/clickupc          # Scoop (Windows)
-winget install mulhamna.clickupc         # winget (once accepted into winget-pkgs)
 ```
 
 Prebuilt archives for Linux, macOS and Windows (x86_64 + aarch64) are on the [Releases](https://github.com/mulhamna/clickup-commands/releases) page with a `checksums.txt` and build provenance attestations.

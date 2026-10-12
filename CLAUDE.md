@@ -180,11 +180,11 @@ release.yml (tag push):
   validate-tag ─► build ×6 (+ provenance) ─► github-release (archives + checksums.txt)
                                                ├─► publish-crates  (OIDC: core → mcp → clickupc)
                                                ├─► publish-npm     (OIDC, @mulham28/clickupc)
-                                               └─► update-packages (brew tap, scoop bucket, winget PR)
+                                               └─► update-packages (brew tap, scoop bucket)
 ```
 
 - Never bump versions, edit `CHANGELOG.md`, or push tags by hand; release-please owns all of it.
-- crates.io and npm publish with **OIDC trusted publishing** from the `release` environment. There are no publish tokens in secrets. Repo secrets are PATs only: `RELEASE_PLEASE_TOKEN` (tag push must trigger workflows, winget PR) and `PACKAGES_TOKEN` (push to the Homebrew tap and Scoop bucket).
+- crates.io and npm publish with **OIDC trusted publishing** from the `release` environment. There are no publish tokens in secrets. Repo secrets are PATs only: `RELEASE_PLEASE_TOKEN` (the tag push must trigger workflows) and `PACKAGES_TOKEN` (push to the Homebrew tap and Scoop bucket).
 - Every publish step is idempotent, so a failed release can be re-run from the Actions tab (`workflow_dispatch` with the tag and `dry_run: false`). `dry_run: true` builds everything and publishes nothing.
 - Don't add a second release-please package, a second `VERSION`, or a second tag pattern.
 

@@ -29,7 +29,7 @@ body:
         - clickupc mcp serve (MCP server)
         - clickupc mcp install / doctor
         - clickupc-core (library)
-        - Packaging (npm / Homebrew / Scoop / winget)
+        - Packaging (npm / Homebrew / Scoop / install script)
         - Other / not sure
     validations:
       required: true
@@ -43,7 +43,7 @@ body:
         - cargo install
         - Homebrew
         - Scoop
-        - winget
+        - install.sh / install.ps1
         - GitHub release binary
         - Built from source
     validations:
