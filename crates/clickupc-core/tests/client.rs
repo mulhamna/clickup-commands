@@ -222,14 +222,16 @@ async fn resolver_list_inputs() {
     let c = ClickUpClient::new(&cfg).unwrap();
     let r = Resolver::new(&c, &cfg).unwrap();
 
-    assert_eq!(r.list("303").await.unwrap().name, "Inbox"); // exact id
+    assert_eq!(r.list("inbox").await.unwrap().id, "303"); // unique name (walks tree)
+    assert_eq!(r.list("303").await.unwrap().name, "Inbox"); // exact id, name from cache
+    assert_eq!(r.list("999").await.unwrap().name, "999"); // unknown id is trusted
     assert_eq!(r.list("sprint").await.unwrap().id, "301"); // alias
     assert_eq!(
         r.list("Engineering/Sprints/Backlog").await.unwrap().id,
         "302"
     ); // path
     assert_eq!(r.list("Marketing/Backlog").await.unwrap().id, "401"); // folderless path
-    assert_eq!(r.list("inbox").await.unwrap().id, "303"); // unique name
+    assert_eq!(server.received_requests().await.unwrap().len(), 5);
 
     match r.list("Backlog").await.unwrap_err() {
         e @ ClickUpError::Resolve { .. } => {

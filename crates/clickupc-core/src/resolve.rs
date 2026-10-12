@@ -311,6 +311,17 @@ impl<'a> Resolver<'a> {
         Ok((tree, true))
     }
 
+    /// Tree from memory or disk, without touching the network.
+    fn cached_tree(&self) -> Option<Hierarchy> {
+        if let Some((h, _)) = self.hierarchy.lock().expect("hierarchy lock").clone() {
+            return Some(h);
+        }
+        if self.refresh {
+            return None;
+        }
+        self.cache.load::<Hierarchy>("hierarchy.json")
+    }
+
     /// Run `find` against the tree; on a miss with a cached tree, refetch once.
     async fn with_tree<T>(
         &self,
@@ -337,13 +348,23 @@ impl<'a> Resolver<'a> {
             .map(|(_, v)| v.as_str())
             .unwrap_or(input);
         let is_id = target.chars().all(|c| c.is_ascii_digit()) && !target.is_empty();
+        if is_id {
+            // Ids never trigger a hierarchy walk; the cached tree (if any)
+            // only supplies the display name.
+            return Ok(self
+                .cached_tree()
+                .and_then(|h| h.lists().into_iter().find(|l| l.id == target))
+                .unwrap_or_else(|| ListRef {
+                    id: target.to_string(),
+                    name: target.to_string(),
+                    space: None,
+                    folder: None,
+                }));
+        }
         let lower = target.to_lowercase();
         let (hit, tree) = self
             .with_tree(|h| {
                 let lists = h.lists();
-                if is_id {
-                    return Ok(lists.into_iter().find(|l| l.id == target));
-                }
                 if target.contains('/') {
                     return unique("list", target, &lists, ListRef::path, |l| {
                         let p = l.path().to_lowercase();
@@ -357,15 +378,6 @@ impl<'a> Resolver<'a> {
             .await?;
         if let Some(l) = hit {
             return Ok(l);
-        }
-        if is_id {
-            // Archived or not yet cached; trust the id.
-            return Ok(ListRef {
-                id: target.to_string(),
-                name: target.to_string(),
-                space: None,
-                folder: None,
-            });
         }
         let lists = tree.lists();
         let mut names: Vec<String> = lists.iter().map(|l| l.name.clone()).collect();
