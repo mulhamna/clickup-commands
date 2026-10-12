@@ -255,3 +255,115 @@ async fn streamable_http_transport() {
     let _ = tx.send(());
     let _ = server.await;
 }
+
+/// Two accounts in one config: `work` (pk_work…, workspace 111) is active,
+/// `personal` (pk_home…, workspace 222).
+fn two_profiles(env: &Env, base_url: &str) {
+    let dir = env._dir.path().join("config");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("config.toml"),
+        "current_profile = \"work\"\n\
+         [profiles.work]\ntoken = \"pk_work_aaaaaaaa\"\nworkspace_id = \"111\"\n\
+         [profiles.personal]\ntoken = \"pk_home_bbbbbbbb\"\nworkspace_id = \"222\"\n",
+    )
+    .unwrap();
+    std::env::remove_var("CLICKUP_TOKEN");
+    std::env::remove_var("CLICKUP_WORKSPACE_ID");
+    std::env::set_var("CLICKUP_BASE_URL", base_url);
+}
+
+#[tokio::test]
+#[serial]
+async fn profile_param_switches_account_per_call() {
+    let mock = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v2/user"))
+        .and(wiremock::matchers::header(
+            "authorization",
+            "pk_home_bbbbbbbb",
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "user": { "id": 2, "username": "home" } })),
+        )
+        .expect(1)
+        .mount(&mock)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v2/user"))
+        .and(wiremock::matchers::header(
+            "authorization",
+            "pk_work_aaaaaaaa",
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "user": { "id": 1, "username": "work" } })),
+        )
+        .expect(1)
+        .mount(&mock)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v2/team"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "teams": [] })))
+        .mount(&mock)
+        .await;
+    let env = Env::new(None);
+    two_profiles(&env, &mock.uri());
+    let (client, server) = connect().await;
+
+    let home = call(&client, "clickup_whoami", json!({ "profile": "personal" }))
+        .await
+        .unwrap();
+    assert_eq!(home["result"]["username"], json!("home"));
+    let work = call(&client, "clickup_whoami", json!({})).await.unwrap();
+    assert_eq!(work["result"]["username"], json!("work"));
+
+    let err = call(&client, "clickup_whoami", json!({ "profile": "nope" }))
+        .await
+        .unwrap_err();
+    assert!(
+        err.contains("config_error") && err.contains("unknown profile"),
+        "{err}"
+    );
+
+    let list = call(&client, "clickup_profile_list", json!({}))
+        .await
+        .unwrap();
+    assert_eq!(list["result"]["active"], json!("work"));
+    assert_eq!(list["result"]["profiles"].as_array().unwrap().len(), 2);
+    assert!(!list.to_string().contains("pk_home_bbbbbbbb"));
+
+    client.cancel().await.unwrap();
+    server.await.unwrap();
+}
+
+#[tokio::test]
+#[serial]
+async fn workspace_param_resolves_name() {
+    let mock = MockServer::start().await;
+    Mock::given(path("/v2/team"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "teams": [
+            { "id": "111", "name": "Acme" }, { "id": "333", "name": "Side Project" }
+        ]})))
+        .mount(&mock)
+        .await;
+    Mock::given(path("/v2/team/333/space"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "spaces": [] })))
+        .expect(1)
+        .mount(&mock)
+        .await;
+    let env = Env::new(None);
+    two_profiles(&env, &mock.uri());
+    let (client, server) = connect().await;
+    let out = call(
+        &client,
+        "clickup_hierarchy",
+        json!({ "workspace": "side project", "refresh": true }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(out["result"]["spaces"], json!([]));
+    client.cancel().await.unwrap();
+    server.await.unwrap();
+}

@@ -182,3 +182,97 @@ fn mcp_serve_stdout_is_clean_until_initialize() {
     assert_eq!(v["id"], json!(1));
     assert_eq!(v["result"]["serverInfo"]["name"], json!("clickupc"));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn workspace_flag_resolves_name() {
+    let server = MockServer::start().await;
+    Mock::given(path("/v2/team"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "teams": [
+            { "id": "9001", "name": "Acme" }, { "id": "333", "name": "Side Project" }
+        ]})))
+        .mount(&server)
+        .await;
+    Mock::given(path("/v2/team/333/task"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "tasks": [] })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let o = Env::new(Some(server.uri()))
+        .run(&["task", "list", "--workspace", "Side Project", "--json"])
+        .await;
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn mcp_install_one_entry_per_client_and_profile() {
+    let env = Env::new(Some("http://127.0.0.1:9".into()));
+    let o = env
+        .run(&[
+            "mcp",
+            "install",
+            "--client",
+            "generic-json",
+            "--client",
+            "generic-json",
+            "--server-profile",
+            "work",
+            "--server-profile",
+            "personal",
+        ])
+        .await;
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let out = stdout(&o);
+    assert_eq!(out.matches("\"clickupc-work\"").count(), 2, "{out}");
+    assert_eq!(out.matches("\"clickupc-personal\"").count(), 2, "{out}");
+    assert!(out.contains("\"CLICKUP_PROFILE\": \"personal\""), "{out}");
+    assert!(!out.contains("<redacted>"), "{out}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn login_from_stdin_into_new_profile() {
+    let server = MockServer::start().await;
+    Mock::given(path("/v2/user"))
+        .and(wiremock::matchers::header(
+            "authorization",
+            "pk_new_token_123",
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "user": { "id": 5, "username": "ana" } })),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(path("/v2/team"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "teams": [{ "id": "777", "name": "Acme" }] })),
+        )
+        .mount(&server)
+        .await;
+    let env = Env::new(None);
+    let mut cmd = env.cmd(&["--profile", "side", "auth", "login", "--token", "-"]);
+    cmd.env("CLICKUP_BASE_URL", server.uri())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let o = tokio::task::spawn_blocking(move || {
+        let mut child = cmd.spawn().unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(b"pk_new_token_123\n")
+            .unwrap();
+        child.wait_with_output().unwrap()
+    })
+    .await
+    .unwrap();
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    assert!(stdout(&o).contains("saved to profile 'side'"));
+    let cfg = std::fs::read_to_string(env.dir.path().join("config/config.toml")).unwrap();
+    assert!(
+        cfg.contains("[profiles.side]") && cfg.contains("workspace_id = \"777\""),
+        "{cfg}"
+    );
+    assert!(cfg.contains("current_profile = \"side\""), "{cfg}");
+}
