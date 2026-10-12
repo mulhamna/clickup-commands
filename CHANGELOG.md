@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.2](https://github.com/mulhamna/clickup-commands/compare/v1.0.1...v1.0.2) (2026-10-12)
+
+
+### Bug Fixes
+
+* **cli:** describe every command and subcommand in --help ([58501cf](https://github.com/mulhamna/clickup-commands/commit/58501cfdd0b5cc748b2916c3bb16d242a8a0ad9c))
+* complete CLI help and rewrite READMEs for every channel ([a457cc2](https://github.com/mulhamna/clickup-commands/commit/a457cc26f38554db04432d742243fdd98dd0dd65))
+
 ## [1.0.1](https://github.com/mulhamna/clickup-commands/compare/v1.0.0...v1.0.1) (2026-10-12)
 
 
