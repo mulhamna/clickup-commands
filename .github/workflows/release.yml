@@ -70,7 +70,10 @@ jobs:
       - name: CHANGELOG has an entry
         run: |
           VER=$(tr -d '[:space:]' < VERSION)
-          grep -qF "[${VER}]" CHANGELOG.md || { echo "No CHANGELOG entry for $VER"; exit 1; }
+          # release-please writes "## X.Y.Z (date)" for the first release and
+          # "## [X.Y.Z](compare-link) (date)" afterwards; accept both.
+          grep -qE "^## \[?${VER//./\\.}[] (]" CHANGELOG.md \
+            || { echo "No CHANGELOG entry for $VER"; exit 1; }
 
   # ── 1. Build the single binary for six targets ──────────────────────────
   build:
