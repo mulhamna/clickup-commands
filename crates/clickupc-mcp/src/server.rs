@@ -17,7 +17,7 @@ use crate::{
     app,
     error::AppResult,
     models::{
-        ApiRequestArgs, AttachmentArgs, BatchArgs, BulkCreateArgs, BulkUpdateArgs,
+        Account, ApiRequestArgs, AttachmentArgs, BatchArgs, BulkCreateArgs, BulkUpdateArgs,
         ChecklistAddArgs, ChecklistItemUpdateArgs, CommentAddArgs, CommentDeleteArgs,
         CommentIdArgs, CommentListArgs, CommentReplyArgs, CommentUpdateArgs, DependencyArgs,
         DocCreateArgs, DocGetArgs, DocIdArgs, DocPageCreateArgs, DocPageUpdateArgs, DocSearchArgs,
@@ -96,7 +96,7 @@ impl ServerHandler for ClickUpMcpServer {
                     .with_description("Unofficial ClickUp tools for MCP clients"),
             )
             .with_instructions(
-                "Use the clickup_* tools for ClickUp tasks, comments, custom fields, time tracking, docs and raw API access. Inputs accept names (lists, statuses, members, fields, options) or ids, and dates like 'tomorrow' or '2026-10-20'. Delete/remove/clear tools require confirm=true. Use clickup_field_set to change custom fields.",
+                "Use the clickup_* tools for ClickUp tasks, comments, custom fields, time tracking, docs and raw API access. Inputs accept names (lists, statuses, members, fields, options) or ids, and dates like 'tomorrow' or '2026-10-20'. Every tool takes optional `profile` (account, see clickup_profile_list) and `workspace` to switch account or workspace per call. Delete/remove/clear tools require confirm=true. Use clickup_field_set to change custom fields.",
             )
     }
 }
@@ -107,24 +107,41 @@ impl ClickUpMcpServer {
         name = "clickup_auth_status",
         description = "Show the active profile, workspace id, whether a token is configured (masked), and the config path. No API call. Use first when other tools return auth_missing."
     )]
-    pub async fn clickup_auth_status(&self) -> Result<Json<ToolResponse>, ErrorData> {
-        respond(app::auth_status())
+    pub async fn clickup_auth_status(
+        &self,
+        Parameters(args): Parameters<Account>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        respond(app::auth_status(args))
+    }
+
+    #[tool(
+        name = "clickup_profile_list",
+        description = "List the clickupc profiles (ClickUp accounts) configured on this machine and which one is active. Pass `profile` and/or `workspace` to any clickup_* tool to run it as another account or in another workspace."
+    )]
+    pub async fn clickup_profile_list(&self) -> Result<Json<ToolResponse>, ErrorData> {
+        respond(app::profile_list())
     }
 
     #[tool(
         name = "clickup_whoami",
         description = "Show the authenticated ClickUp user (id, username, email, timezone) plus the current workspace and plan."
     )]
-    pub async fn clickup_whoami(&self) -> Result<Json<ToolResponse>, ErrorData> {
-        respond(app::whoami().await)
+    pub async fn clickup_whoami(
+        &self,
+        Parameters(args): Parameters<Account>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        respond(app::whoami(args).await)
     }
 
     #[tool(
         name = "clickup_workspace_list",
         description = "List workspaces the token can access and which one is current. Workspace = 'team' in ClickUp API v2."
     )]
-    pub async fn clickup_workspace_list(&self) -> Result<Json<ToolResponse>, ErrorData> {
-        respond(app::workspace_list().await)
+    pub async fn clickup_workspace_list(
+        &self,
+        Parameters(args): Parameters<Account>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        respond(app::workspace_list(args).await)
     }
 
     #[tool(
@@ -540,16 +557,22 @@ impl ClickUpMcpServer {
     }
 
     #[tool(name = "clickup_time_stop", description = "Stop the running timer.")]
-    pub async fn clickup_time_stop(&self) -> Result<Json<ToolResponse>, ErrorData> {
-        respond(app::time_stop().await)
+    pub async fn clickup_time_stop(
+        &self,
+        Parameters(args): Parameters<Account>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        respond(app::time_stop(args).await)
     }
 
     #[tool(
         name = "clickup_time_current",
         description = "The running time entry, or null."
     )]
-    pub async fn clickup_time_current(&self) -> Result<Json<ToolResponse>, ErrorData> {
-        respond(app::time_current().await)
+    pub async fn clickup_time_current(
+        &self,
+        Parameters(args): Parameters<Account>,
+    ) -> Result<Json<ToolResponse>, ErrorData> {
+        respond(app::time_current(args).await)
     }
 
     #[tool(
