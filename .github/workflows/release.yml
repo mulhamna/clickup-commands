@@ -10,8 +10,9 @@ name: Release
 #     environment release.
 #   - npmjs.com → @mulham28/clickupc → Settings → Trusted Publisher: GitHub
 #     Actions, same repo / workflow / environment.
-#   - Secrets HOMEBREW_TAP_TOKEN, SCOOP_BUCKET_TOKEN, RELEASE_PLEASE_TOKEN
-#     (PATs for pushing to other repos / opening PRs, not publish tokens).
+#   - Secrets (PATs, not publish tokens):
+#       RELEASE_PLEASE_TOKEN  this repo: contents, pull requests, issues (RW)
+#       PACKAGES_TOKEN        mulhamna/homebrew-tap + mulhamna/scoop-bucket: contents (RW)
 #
 # `workflow_dispatch` with dry_run=true builds every artifact and publishes
 # nothing — use it on a fork to validate the pipeline.
@@ -311,7 +312,7 @@ jobs:
 
       - name: Push Homebrew formula
         env:
-          TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TOKEN: ${{ secrets.PACKAGES_TOKEN }}
           VERSION: ${{ steps.v.outputs.version }}
         run: |
           git clone "https://x-access-token:${TOKEN}@github.com/mulhamna/homebrew-tap.git" tap
@@ -327,7 +328,7 @@ jobs:
 
       - name: Push Scoop manifest
         env:
-          TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+          TOKEN: ${{ secrets.PACKAGES_TOKEN }}
           VERSION: ${{ steps.v.outputs.version }}
         run: |
           git clone "https://x-access-token:${TOKEN}@github.com/mulhamna/scoop-bucket.git" bucket

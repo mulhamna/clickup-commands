@@ -184,7 +184,7 @@ release.yml (tag push):
 ```
 
 - Never bump versions, edit `CHANGELOG.md`, or push tags by hand; release-please owns all of it.
-- crates.io and npm publish with **OIDC trusted publishing** from the `release` environment. There are no publish tokens in secrets. Repo secrets are PATs only: `RELEASE_PLEASE_TOKEN` (tag push must trigger workflows, winget PR), `HOMEBREW_TAP_TOKEN`, `SCOOP_BUCKET_TOKEN`.
+- crates.io and npm publish with **OIDC trusted publishing** from the `release` environment. There are no publish tokens in secrets. Repo secrets are PATs only: `RELEASE_PLEASE_TOKEN` (tag push must trigger workflows, winget PR) and `PACKAGES_TOKEN` (push to the Homebrew tap and Scoop bucket).
 - Every publish step is idempotent, so a failed release can be re-run from the Actions tab (`workflow_dispatch` with the tag and `dry_run: false`). `dry_run: true` builds everything and publishes nothing.
 - Don't add a second release-please package, a second `VERSION`, or a second tag pattern.
 
