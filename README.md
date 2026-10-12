@@ -26,6 +26,16 @@ Rate limits are handled automatically: on HTTP 429 the client waits until `X-Rat
 Every channel installs the same single binary.
 
 ```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/mulhamna/clickup-commands/main/install.sh | bash
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/mulhamna/clickup-commands/main/install.ps1 | iex
+```
+
+Both scripts verify the download against the release's `checksums.txt`. Pin a version with `CLICKUPC_VERSION=v0.1.0` (sh) or `-Version v0.1.0` (PowerShell).
+
+```bash
 npm i -g @mulham28/clickupc              # npm
 cargo install clickupc                   # crates.io
 brew install mulhamna/tap/clickupc       # Homebrew (macOS / Linux)
