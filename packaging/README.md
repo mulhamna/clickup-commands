@@ -6,6 +6,5 @@ is published — don't edit versions or hashes by hand.
 | Path | Channel | How it's updated |
 | --- | --- | --- |
 | `npm/` | `@mulham28/clickupc` on npm | version bumped by release-please; published via npm Trusted Publishing (OIDC) |
-| `winget/` | `mulhamna.clickupc` source manifests | release workflow opens a PR with the new version + SHA-256; submit to `microsoft/winget-pkgs` from there |
 | Homebrew | `mulhamna/homebrew-tap` → `Formula/clickupc.rb` | release workflow writes the formula and pushes to the tap |
 | Scoop | `mulhamna/scoop-bucket` → `bucket/clickupc.json` | release workflow writes the manifest and pushes to the bucket |

@@ -47,7 +47,7 @@ detect_platform() {
       esac
       ;;
     *)
-      error "Unsupported OS: $os. On Windows use install.ps1, scoop or winget."
+      error "Unsupported OS: $os. On Windows use install.ps1 or scoop."
       ;;
   esac
 }
