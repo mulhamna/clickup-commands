@@ -203,6 +203,6 @@ clickupc api PUT /v3/workspaces/{workspace}/tasks/abc/home_list/456 --data @body
 clickupc config get|set <key> [value]               # default_task_limit, timezone, default_list, timeout_secs
 clickupc mcp serve [--transport stdio|streamable-http] [--host] [--port] [--path]   # run the MCP server
 clickupc mcp doctor                                 # check binary on PATH, token, workspace, a test call
-clickupc mcp install --client claude-code|claude-desktop|cursor|gemini-cli|codex|vscode|… [--profile]
+clickupc mcp install --client claude-code|claude-desktop|cursor|gemini-cli|codex|vscode|… [--server-profile <name>] [--dry-run] [--force]
 ```
-Port `mcp install` targets and config-writing logic from `jira/src/cli/mcp.rs`, but the written entry is `command: "clickupc", args: ["mcp", "serve"]` (no separate MCP binary).
+Registration goes through `kurir` (same targets as `jirac mcp install`); the written entry is `command: "clickupc", args: ["mcp", "serve"]` (no separate MCP binary). `--server-profile` pins `CLICKUP_PROFILE` in the entry; the token is never written.

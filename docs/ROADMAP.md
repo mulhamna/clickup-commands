@@ -107,11 +107,12 @@ Core + CLI + MCP for:
 ## Phase 6 — Release & distribution
 
 Adapt from jira-commands (single lane, single binary), renaming everything per `CLAUDE.md` "Names":
-- [ ] release-please with **one** lane: tag `vX.Y.Z`, `/VERSION` drives all three crates (generic updater on each `Cargo.toml`). No `separate-pull-requests`, no MCP manifest.
-- [ ] Release workflows building binaries (linux/macos/windows, x86_64 + aarch64), crates.io publish order `clickupc-core` → `clickupc-mcp` → `clickupc`.
-- [ ] One npm wrapper `@mulham28/clickupc` (bin: `clickupc`); one brew formula, one scoop/winget manifest, install.sh/ps1, Docker — each installs the single binary, which covers both CLI and MCP.
+- [x] release-please with **one** lane: tag `vX.Y.Z`, `/VERSION` drives all three crates (generic updater on each `Cargo.toml`). No `separate-pull-requests`, no MCP manifest.
+- [x] Release workflows building binaries (linux/macos/windows, x86_64 + aarch64), crates.io publish order `clickupc-core` → `clickupc-mcp` → `clickupc`, via OIDC trusted publishing.
+- [x] One npm wrapper `@mulham28/clickupc` (bin: `clickupc`); one brew formula, one scoop/winget manifest — each installs the single binary, which covers both CLI and MCP.
+- [ ] install.sh/ps1, Docker (deferred).
 - [ ] Claude Code plugin (`plugin/`) with ClickUp skills: list-tasks, view-task, create-task, update-task, set-status, bulk-update, comment, time, fields, standup, api.
-- [ ] Add a release-flow section to CLAUDE.md, adapted from jira-commands but with one lane (drop the dual-lane and manifest-race parts).
+- [x] Add a release-flow section to CLAUDE.md, adapted from jira-commands but with one lane (drop the dual-lane and manifest-race parts).
 
 **Accept:** a dry-run release on a fork publishes nothing but builds all artifacts.
 
