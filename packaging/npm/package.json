@@ -1,0 +1,36 @@
+{
+  "name": "@mulham28/clickupc",
+  "version": "0.0.0",
+  "description": "Unofficial ClickUp CLI and MCP server in one binary, installed from GitHub Releases",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mulhamna/clickup-commands.git"
+  },
+  "homepage": "https://github.com/mulhamna/clickup-commands",
+  "bugs": {
+    "url": "https://github.com/mulhamna/clickup-commands/issues"
+  },
+  "keywords": [
+    "clickup",
+    "cli",
+    "mcp",
+    "mcp-server",
+    "productivity"
+  ],
+  "bin": {
+    "clickupc": "bin/clickupc.js"
+  },
+  "files": [
+    "bin",
+    "lib/install.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "postinstall": "node ./lib/install.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
