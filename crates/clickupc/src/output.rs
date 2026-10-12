@@ -37,8 +37,10 @@ where
     println!("{}", table(headers, rows));
 }
 
+/// Prompts render on stderr (inquire), so only stdin and stderr must be a
+/// terminal; stdout may be piped.
 pub fn is_tty() -> bool {
-    std::io::stdin().is_terminal() && std::io::stdout().is_terminal()
+    std::io::stdin().is_terminal() && std::io::stderr().is_terminal()
 }
 
 /// Error naming the flag when we can't prompt.

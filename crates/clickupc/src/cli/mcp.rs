@@ -144,11 +144,26 @@ impl McpClient {
 
 impl std::fmt::Display for McpClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let v = self
-            .to_possible_value()
-            .map(|v| v.get_name().to_string())
-            .unwrap_or_default();
-        f.write_str(&v)
+        const LABELS: [&str; 17] = [
+            "claude-code         (~/.claude.json)",
+            "claude-code-cli     (delegates to `claude mcp add`)",
+            "claude-desktop      (Claude Desktop config)",
+            "cursor              (Cursor mcp.json)",
+            "gemini-cli          (delegates to `gemini mcp add`)",
+            "codex               (delegates to `codex mcp add`)",
+            "vscode              (delegates to `code --add-mcp`)",
+            "copilot-cli         (~/.copilot/mcp-config.json)",
+            "opencode            (opencode.json)",
+            "windsurf            (Windsurf config)",
+            "zed                 (Zed settings)",
+            "openclaw            (openclaw.json)",
+            "hermes              (delegates to `hermes mcp add`)",
+            "antigravity-cli     (Antigravity CLI config)",
+            "antigravity-desktop (Antigravity Desktop config)",
+            "generic-json        (print snippet only)",
+            "arsy-code           (delegates to `arsy mcp add`)",
+        ];
+        f.write_str(LABELS[*self as usize])
     }
 }
 
@@ -197,26 +212,41 @@ pub async fn run(cmd: McpCmd) -> Result<()> {
     }
 }
 
-fn credentials_ok() -> bool {
-    ClickUpConfig::load()
-        .map(|c| c.token.is_some() && c.workspace_id.is_some())
-        .unwrap_or(false)
-}
-
 fn pick_client(command: &str) -> Result<McpClient> {
     crate::output::require_tty("MCP client", "--client <target>")?;
+    println!("{}", crate::help_text::BANNER.trim_end());
+    println!();
+    println!("clickupc mcp install — interactive setup");
+    println!("────────────────────────────────────────");
     match resolve_command_path(command) {
-        Some(p) => println!("[ok]   clickupc binary: {}", p.display()),
-        None => println!("[warn] '{command}' is not on PATH"),
+        Some(p) => println!("[ok]   clickupc binary:  {}", p.display()),
+        None => println!("[warn] '{command}' is not on PATH (pass --command /path/to/clickupc)"),
     }
-    if credentials_ok() {
-        println!("[ok]   ClickUp token and workspace configured");
-    } else {
-        bail!("ClickUp credentials missing. Run `clickupc auth login` first, then re-run `clickupc mcp install`.");
+    let cfg = ClickUpConfig::load().ok();
+    match &cfg {
+        Some(c) if c.token.is_some() && c.workspace_id.is_some() => println!(
+            "[ok]   ClickUp auth:     profile '{}', workspace {}",
+            c.profile,
+            c.workspace_id.as_deref().unwrap_or_default()
+        ),
+        Some(c) if c.token.is_some() => {
+            println!("[fail] ClickUp auth:     token present, no workspace selected")
+        }
+        _ => println!("[fail] ClickUp auth:     no token configured"),
     }
-    inquire::Select::new("Install into which MCP client?", ALL_CLIENTS.to_vec())
+    if !cfg
+        .as_ref()
+        .is_some_and(|c| c.token.is_some() && c.workspace_id.is_some())
+    {
+        bail!(
+            "ClickUp credentials are not set up yet. Run:\n\n  clickupc auth login\n\nthen re-run `clickupc mcp install`."
+        );
+    }
+    println!();
+    inquire::Select::new("Pick the MCP client to install into:", ALL_CLIENTS.to_vec())
+        .with_page_size(17)
         .prompt()
-        .context("selection cancelled")
+        .context("MCP client selection cancelled")
 }
 
 pub fn server_spec(name: &str, command: String, profile: Option<&str>) -> ServerSpec {
