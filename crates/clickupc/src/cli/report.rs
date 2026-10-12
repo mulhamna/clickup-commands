@@ -84,7 +84,7 @@ fn section(title: &str, tasks: &[Task], tz: Option<&str>) {
 }
 
 pub async fn standup(ctx: &Ctx, since: String, user: Option<String>) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     let out = ops::standup(&r, &since, user.as_deref()).await?;
     if ctx.json {
@@ -105,7 +105,7 @@ pub async fn standup(ctx: &Ctx, since: String, user: Option<String>) -> Result<(
 }
 
 pub async fn summary(ctx: &Ctx, list: String) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     let out = ops::list_summary(&r, &list).await?;
     if ctx.json {
@@ -131,7 +131,7 @@ pub async fn summary(ctx: &Ctx, list: String) -> Result<()> {
 }
 
 pub async fn doc(ctx: &Ctx, cmd: DocCmd) -> Result<()> {
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let r = s.resolver()?;
     let out: Value = match cmd {
         DocCmd::Search { query, limit } => {
@@ -252,7 +252,7 @@ pub async fn api(ctx: &Ctx, method: String, path: String, data: Option<String>) 
     if method != "GET" && !confirm(ctx.yes, &format!("Send {method} {path}?"))? {
         return Ok(());
     }
-    let s = ctx.session()?;
+    let s = ctx.session().await?;
     let v = s.client.raw(&method, &path, body).await?;
     print_json(&v)
 }

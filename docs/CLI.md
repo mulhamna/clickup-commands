@@ -5,7 +5,7 @@ Conventions:
 - Anything that takes a task accepts a task id, custom id (`DEV-123`), or task URL.
 - Dates accept `2026-10-20`, `2026-10-20 14:00`, `today`, `tomorrow`, `fri`, `+3d`, `eow`, … (see ARCHITECTURE `time.rs`).
 - Durations accept `1h30m`, `45m`, `2h`.
-- Global flags: `--profile <name>`, `--json`, `-v/--verbose`, `--refresh`, `-y/--yes`.
+- Global flags: `--profile <name>`, `--workspace <name|id>`, `--json`, `-v/--verbose`, `--refresh`, `-y/--yes`.
 - Phase tags (P1…P5) refer to `docs/ROADMAP.md`.
 
 ---
@@ -13,11 +13,14 @@ Conventions:
 ## auth (P1)
 
 ```
-clickupc auth login [--token pk_…] [--profile work]   # prompts for token if omitted, validates via GET /v2/user,
-                                                      # then lists workspaces (GET /v2/team) and asks which one
+clickupc auth login [--token pk_…|-] [--profile work] [--workspace <w>]
+    # Terminal: if profiles exist, pick "+ New profile" or one to update (never overwritten silently);
+    # token input is masked; workspace picker; new profile name suggested from the workspace;
+    # asks whether to make it active, then offers to run `mcp install`.
+    # Non-TTY: --token, --token - (stdin) or CLICKUP_TOKEN; updates --profile or the active profile.
 clickupc auth status                                  # profile, workspace, user, token present (masked), config path
 clickupc auth logout [--profile work]                 # remove stored token
-clickupc auth profile list | use <name> | remove <name>
+clickupc auth profile list | use [<name>] | remove <name>   # `use` without a name shows a picker
 clickupc whoami                                       # user id, username, email, timezone, workspace + plan
 ```
 
@@ -25,7 +28,7 @@ clickupc whoami                                       # user id, username, email
 
 ```
 clickupc workspace list
-clickupc workspace use <name|id>                     # set workspace_id on current profile
+clickupc workspace use [<name|id>]                   # set workspace_id on current profile (picker when omitted)
 clickupc tree [--space <s>] [--archived]             # Space → Folder → List tree with ids
 clickupc space list
 clickupc folder list --space <s>
@@ -203,6 +206,9 @@ clickupc api PUT /v3/workspaces/{workspace}/tasks/abc/home_list/456 --data @body
 clickupc config get|set <key> [value]               # default_task_limit, timezone, default_list, timeout_secs
 clickupc mcp serve [--transport stdio|streamable-http] [--host] [--port] [--path]   # run the MCP server
 clickupc mcp doctor                                 # check binary on PATH, token, workspace, a test call
-clickupc mcp install --client claude-code|claude-desktop|cursor|gemini-cli|codex|vscode|… [--server-profile <name>] [--dry-run] [--force]
+clickupc mcp install [--client <c>]… [--server-profile <p>]… [--name clickupc] [--dry-run] [--force]
+    # No --client on a terminal: prerequisite checklist (runs `auth login` if needed), then checkbox
+    # pickers for clients and, with several profiles, for profiles. One entry per client × profile:
+    # `clickupc` for a single profile, `clickupc-<profile>` for several, each pinned via CLICKUP_PROFILE.
 ```
 Registration goes through `kurir`; the written entry is `command: "clickupc", args: ["mcp", "serve"]` (no separate MCP binary). `--server-profile` pins `CLICKUP_PROFILE` in the entry; the token is never written.

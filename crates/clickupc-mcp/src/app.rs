@@ -3,14 +3,14 @@
 //! restarting the server; the rate limiter is shared across calls.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     path::PathBuf,
-    sync::{Arc, OnceLock},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 use clickupc_core::{
     client::{DocParent, NewTimeEntry, TimeQuery},
-    config::ClickUpConfig,
+    config::{mask_token, ClickUpConfig, ConfigFile},
     model::{Comment, Task, TimeEntry},
     ops::{self, BatchOp, BulkChanges, SearchInput, TaskInput, UpdateInput},
     rate_limit::RateLimiter,
@@ -27,10 +27,16 @@ use crate::{
 pub const DEFAULT_SEARCH_LIMIT: usize = 50;
 pub const MAX_SEARCH_LIMIT: usize = 500;
 
-fn limiter() -> Arc<RateLimiter> {
-    static LIMITER: OnceLock<Arc<RateLimiter>> = OnceLock::new();
-    LIMITER
-        .get_or_init(|| Arc::new(RateLimiter::default()))
+/// One limiter per token: ClickUp's budget is per token, so two accounts in
+/// one server must not throttle each other.
+fn limiter_for(token: &str) -> Arc<RateLimiter> {
+    static LIMITERS: OnceLock<Mutex<HashMap<String, Arc<RateLimiter>>>> = OnceLock::new();
+    LIMITERS
+        .get_or_init(Default::default)
+        .lock()
+        .expect("limiter map lock")
+        .entry(token.to_string())
+        .or_insert_with(|| Arc::new(RateLimiter::default()))
         .clone()
 }
 
@@ -40,9 +46,21 @@ pub struct Ctx {
 }
 
 impl Ctx {
-    pub fn load() -> AppResult<Self> {
-        let cfg = ClickUpConfig::load()?;
-        let client = ClickUpClient::new(&cfg)?.with_limiter(limiter());
+    /// Config for the requested profile (or the server's), with an optional
+    /// per-call workspace override.
+    pub async fn load(acc: &Account) -> AppResult<Self> {
+        let mut cfg = load_config(acc.profile.as_deref())?;
+        let token = cfg.token()?.to_string();
+        let mut client = ClickUpClient::new(&cfg)?.with_limiter(limiter_for(&token));
+        if let Some(w) = acc.workspace.as_deref().filter(|w| !w.trim().is_empty()) {
+            let id = if w.chars().all(|c| c.is_ascii_digit()) {
+                w.to_string()
+            } else {
+                client.find_workspace(w).await?.id
+            };
+            cfg.workspace_id = Some(id.clone());
+            client = client.with_workspace(id);
+        }
         Ok(Self { cfg, client })
     }
 
@@ -53,6 +71,19 @@ impl Ctx {
     fn tz(&self) -> Option<&str> {
         self.cfg.timezone.as_deref()
     }
+}
+
+fn load_config(profile: Option<&str>) -> AppResult<ClickUpConfig> {
+    if let Some(p) = profile {
+        let file = ConfigFile::load()?;
+        if !file.profiles.contains_key(p) {
+            let names: Vec<&String> = file.profiles.keys().collect();
+            return Err(AppError::config_error(format!(
+                "unknown profile '{p}'; available: {names:?} (see clickup_profile_list)"
+            )));
+        }
+    }
+    Ok(ClickUpConfig::load_profile(profile)?)
 }
 
 pub fn require_confirm(confirm: Option<bool>) -> AppResult<()> {
@@ -201,8 +232,8 @@ fn task_input(f: &TaskFields) -> TaskInput {
 
 // ── auth & meta ──────────────────────────────────────────────────────────
 
-pub fn auth_status() -> AppResult<Value> {
-    let cfg = ClickUpConfig::load()?;
+pub fn auth_status(a: Account) -> AppResult<Value> {
+    let cfg = load_config(a.profile.as_deref())?;
     Ok(json!({
         "profile": cfg.profile,
         "workspace_id": cfg.workspace_id,
@@ -213,8 +244,8 @@ pub fn auth_status() -> AppResult<Value> {
     }))
 }
 
-pub async fn whoami() -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+pub async fn whoami(a: Account) -> AppResult<Value> {
+    let ctx = Ctx::load(&a).await?;
     let user = ctx.client.user().await?;
     let ws = match &ctx.cfg.workspace_id {
         Some(id) => ctx
@@ -237,8 +268,8 @@ pub async fn whoami() -> AppResult<Value> {
     }))
 }
 
-pub async fn workspace_list() -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+pub async fn workspace_list(a: Account) -> AppResult<Value> {
+    let ctx = Ctx::load(&a).await?;
     let current = ctx.cfg.workspace_id.clone();
     let ws = ctx.client.workspaces().await?;
     Ok(json!(ws
@@ -251,7 +282,7 @@ pub async fn workspace_list() -> AppResult<Value> {
 }
 
 pub async fn hierarchy(a: HierarchyArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let mut tree = r.hierarchy(a.refresh.unwrap_or(false)).await?;
     if let Some(space) = &a.space {
@@ -262,7 +293,7 @@ pub async fn hierarchy(a: HierarchyArgs) -> AppResult<Value> {
 }
 
 pub async fn list_get(a: ListArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let list = r.list(&a.list).await?;
     let detail = ctx.client.list(&list.id).await?;
@@ -282,7 +313,7 @@ pub async fn list_get(a: ListArgs) -> AppResult<Value> {
 }
 
 pub async fn member_list(a: MemberListArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let members = match &a.list {
         Some(l) => ctx.client.list_members(&r.list(l).await?.id).await?,
@@ -295,7 +326,7 @@ pub async fn member_list(a: MemberListArgs) -> AppResult<Value> {
 }
 
 pub async fn member_resolve(a: MemberResolveArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let mut out = Vec::new();
     for q in &a.queries {
@@ -347,7 +378,7 @@ pub async fn api_request(a: ApiRequestArgs) -> AppResult<Value> {
             .join("&");
         path = format!("{path}?{encoded}");
     }
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     Ok(ctx.client.raw(&method, &path, a.body).await?)
 }
 
@@ -362,10 +393,25 @@ fn enc(s: &str) -> String {
         .collect()
 }
 
+pub fn profile_list() -> AppResult<Value> {
+    let file = ConfigFile::load()?;
+    let active = file.selected_profile_name();
+    Ok(json!({
+        "active": active,
+        "profiles": file.profiles.iter().map(|(name, p)| json!({
+            "name": name,
+            "workspace_id": p.workspace_id,
+            "token": p.token.as_deref().map(mask_token),
+            "active": *name == active,
+        })).collect::<Vec<_>>(),
+        "hint": "Pass `profile` (and optionally `workspace`) to any clickup_* tool to run it as that account.",
+    }))
+}
+
 // ── tasks ────────────────────────────────────────────────────────────────
 
 pub async fn task_search(a: TaskSearchArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let tasks = ops::search(&r, &search_input(&a)).await?;
     let full = is_full(&a.detail);
@@ -377,7 +423,7 @@ pub async fn task_search(a: TaskSearchArgs) -> AppResult<Value> {
 }
 
 pub async fn task_get(a: TaskGetArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let t = task_ref(&a.task)?;
     let full = is_full(&a.detail);
     let task = ctx
@@ -404,14 +450,14 @@ pub async fn task_get(a: TaskGetArgs) -> AppResult<Value> {
 }
 
 pub async fn task_create(a: TaskCreateArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let t = ops::create_task(&r, &a.list, &task_input(&a.fields)).await?;
     Ok(ops::task_summary(&t, ctx.tz()))
 }
 
 pub async fn task_update(a: TaskUpdateArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let input = UpdateInput {
         task: TaskInput {
@@ -440,14 +486,14 @@ pub async fn task_update(a: TaskUpdateArgs) -> AppResult<Value> {
 }
 
 pub async fn task_set_status(a: TaskStatusArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let t = ops::set_status(&r, &task_ref(&a.task)?, &a.status).await?;
     Ok(ops::task_summary(&t, ctx.tz()))
 }
 
 pub async fn task_move(a: TaskMoveArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     Ok(ops::move_task(
         &r,
@@ -461,7 +507,7 @@ pub async fn task_move(a: TaskMoveArgs) -> AppResult<Value> {
 
 pub async fn task_delete(a: TaskConfirmArgs) -> AppResult<Value> {
     require_confirm(a.confirm)?;
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     ctx.client.delete_task(&task_ref(&a.task)?).await?;
     Ok(json!({ "deleted": a.task }))
 }
@@ -480,7 +526,7 @@ pub async fn task_bulk_create(a: BulkCreateArgs) -> AppResult<Value> {
             "would_create": inputs.iter().map(|t| t.name.clone()).collect::<Vec<_>>(),
         }));
     }
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let results = ops::bulk_create(&r, &a.list, inputs, || {}).await?;
     let items: Vec<Value> = results
@@ -508,7 +554,7 @@ pub async fn task_bulk_update(a: BulkUpdateArgs) -> AppResult<Value> {
     if changes.is_empty() {
         return Err(AppError::validation("changes must set at least one field"));
     }
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let tasks: Vec<TaskRef> = match (&a.tasks, &a.filter) {
         (Some(ids), None) => ids.iter().map(|s| task_ref(s)).collect::<AppResult<_>>()?,
@@ -573,7 +619,7 @@ pub async fn task_batch(a: BatchArgs) -> AppResult<Value> {
     if ops_list.len() > 1 || ops_list.iter().any(BatchOp::is_destructive) {
         require_confirm(a.confirm)?;
     }
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let mut results = Vec::new();
     for op in &ops_list {
@@ -588,7 +634,7 @@ pub async fn task_batch(a: BatchArgs) -> AppResult<Value> {
 // ── comments ─────────────────────────────────────────────────────────────
 
 pub async fn comment_list(a: CommentListArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let comments = ctx
         .client
         .task_comments(&task_ref(&a.task)?, Some(a.limit.unwrap_or(25).max(1)))
@@ -600,7 +646,7 @@ pub async fn comment_list(a: CommentListArgs) -> AppResult<Value> {
 }
 
 pub async fn comment_add(a: CommentAddArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let assignee = match &a.assignee {
         Some(m) => Some(ctx.resolver()?.member_id(m).await?),
         None => None,
@@ -617,7 +663,7 @@ pub async fn comment_add(a: CommentAddArgs) -> AppResult<Value> {
 }
 
 pub async fn comment_update(a: CommentUpdateArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     ctx.client
         .update_comment(&a.comment_id, &a.text, a.resolved)
         .await?;
@@ -626,13 +672,13 @@ pub async fn comment_update(a: CommentUpdateArgs) -> AppResult<Value> {
 
 pub async fn comment_delete(a: CommentDeleteArgs) -> AppResult<Value> {
     require_confirm(a.confirm)?;
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     ctx.client.delete_comment(&a.comment_id).await?;
     Ok(json!({ "deleted": a.comment_id }))
 }
 
 pub async fn comment_replies(a: CommentIdArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let replies = ctx.client.comment_replies(&a.comment_id).await?;
     Ok(json!(replies
         .iter()
@@ -641,7 +687,7 @@ pub async fn comment_replies(a: CommentIdArgs) -> AppResult<Value> {
 }
 
 pub async fn comment_reply(a: CommentReplyArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     Ok(ctx
         .client
         .reply_comment(&a.comment_id, &a.text, false)
@@ -651,7 +697,7 @@ pub async fn comment_reply(a: CommentReplyArgs) -> AppResult<Value> {
 // ── custom fields ────────────────────────────────────────────────────────
 
 pub async fn field_list(a: ListArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let list = r.list(&a.list).await?;
     let fields = ctx.client.list_fields(&list.id).await?;
@@ -674,7 +720,7 @@ async fn task_list_id(ctx: &Ctx, t: &TaskRef) -> AppResult<String> {
 }
 
 pub async fn field_set(a: FieldSetArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let t = task_ref(&a.task)?;
     let list = task_list_id(&ctx, &t).await?;
@@ -686,7 +732,7 @@ pub async fn field_set(a: FieldSetArgs) -> AppResult<Value> {
 
 pub async fn field_clear(a: FieldClearArgs) -> AppResult<Value> {
     require_confirm(a.confirm)?;
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let t = task_ref(&a.task)?;
     let list = task_list_id(&ctx, &t).await?;
@@ -698,7 +744,7 @@ pub async fn field_clear(a: FieldClearArgs) -> AppResult<Value> {
 // ── relations ────────────────────────────────────────────────────────────
 
 pub async fn tag_add(a: TagArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let t = task_ref(&a.task)?;
     for tag in &a.tags {
         ctx.client.add_tag(&t, tag).await?;
@@ -707,7 +753,7 @@ pub async fn tag_add(a: TagArgs) -> AppResult<Value> {
 }
 
 pub async fn tag_remove(a: TagArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let t = task_ref(&a.task)?;
     for tag in &a.tags {
         ctx.client.remove_tag(&t, tag).await?;
@@ -716,7 +762,7 @@ pub async fn tag_remove(a: TagArgs) -> AppResult<Value> {
 }
 
 pub async fn link_add(a: LinkArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     ctx.client
         .add_link(&task_ref(&a.task)?, &task_ref(&a.other_task)?)
         .await?;
@@ -725,7 +771,7 @@ pub async fn link_add(a: LinkArgs) -> AppResult<Value> {
 
 pub async fn link_remove(a: LinkArgs) -> AppResult<Value> {
     require_confirm(a.confirm)?;
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     ctx.client
         .remove_link(&task_ref(&a.task)?, &task_ref(&a.other_task)?)
         .await?;
@@ -745,7 +791,7 @@ fn dependency(a: &DependencyArgs) -> AppResult<(TaskRef, clickupc_core::client::
 
 pub async fn dependency_add(a: DependencyArgs) -> AppResult<Value> {
     let (other, kind) = dependency(&a)?;
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     ctx.client
         .add_dependency(&task_ref(&a.task)?, &other, kind)
         .await?;
@@ -755,7 +801,7 @@ pub async fn dependency_add(a: DependencyArgs) -> AppResult<Value> {
 pub async fn dependency_remove(a: DependencyArgs) -> AppResult<Value> {
     require_confirm(a.confirm)?;
     let (other, kind) = dependency(&a)?;
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     ctx.client
         .remove_dependency(&task_ref(&a.task)?, &other, kind)
         .await?;
@@ -763,7 +809,7 @@ pub async fn dependency_remove(a: DependencyArgs) -> AppResult<Value> {
 }
 
 pub async fn checklist_add(a: ChecklistAddArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let c = ctx
         .client
         .create_checklist(&task_ref(&a.task)?, &a.name, &a.items)
@@ -772,7 +818,7 @@ pub async fn checklist_add(a: ChecklistAddArgs) -> AppResult<Value> {
 }
 
 pub async fn checklist_item_update(a: ChecklistItemUpdateArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     Ok(ctx
         .client
         .update_checklist_item(&a.checklist_id, &a.item_id, a.resolved, a.name.as_deref())
@@ -784,7 +830,7 @@ pub async fn attachment_upload(a: AttachmentArgs) -> AppResult<Value> {
     if !path.is_file() {
         return Err(AppError::validation(format!("no such file: {}", a.path)));
     }
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     Ok(ctx
         .client
         .upload_attachment(&task_ref(&a.task)?, &path)
@@ -792,7 +838,7 @@ pub async fn attachment_upload(a: AttachmentArgs) -> AppResult<Value> {
 }
 
 pub async fn task_add_to_list(a: TaskListArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let list = ctx.resolver()?.list(&a.list).await?;
     ctx.client
         .add_task_to_list(&task_ref(&a.task)?, &list.id)
@@ -802,7 +848,7 @@ pub async fn task_add_to_list(a: TaskListArgs) -> AppResult<Value> {
 
 pub async fn task_remove_from_list(a: TaskListArgs) -> AppResult<Value> {
     require_confirm(a.confirm)?;
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let list = ctx.resolver()?.list(&a.list).await?;
     ctx.client
         .remove_task_from_list(&task_ref(&a.task)?, &list.id)
@@ -813,7 +859,7 @@ pub async fn task_remove_from_list(a: TaskListArgs) -> AppResult<Value> {
 // ── time ─────────────────────────────────────────────────────────────────
 
 pub async fn time_list(a: TimeListArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let mut q = TimeQuery {
         start: a
@@ -848,7 +894,7 @@ pub async fn time_list(a: TimeListArgs) -> AppResult<Value> {
 }
 
 pub async fn time_add(a: TimeAddArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let duration = parse_duration(&a.duration)?;
     let start = match &a.at {
         Some(s) => parse_when(s, ctx.tz())?,
@@ -868,7 +914,7 @@ pub async fn time_add(a: TimeAddArgs) -> AppResult<Value> {
 }
 
 pub async fn time_start(a: TimeStartArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let t = a.task.as_deref().map(task_ref).transpose()?;
     let e = ctx
         .client
@@ -877,14 +923,14 @@ pub async fn time_start(a: TimeStartArgs) -> AppResult<Value> {
     Ok(time_out(&e, ctx.tz()))
 }
 
-pub async fn time_stop() -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+pub async fn time_stop(a: Account) -> AppResult<Value> {
+    let ctx = Ctx::load(&a).await?;
     let e = ctx.client.stop_timer().await?;
     Ok(time_out(&e, ctx.tz()))
 }
 
-pub async fn time_current() -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+pub async fn time_current(a: Account) -> AppResult<Value> {
+    let ctx = Ctx::load(&a).await?;
     Ok(match ctx.client.current_timer().await? {
         Some(e) => time_out(&e, ctx.tz()),
         None => Value::Null,
@@ -893,13 +939,13 @@ pub async fn time_current() -> AppResult<Value> {
 
 pub async fn time_delete(a: TimeDeleteArgs) -> AppResult<Value> {
     require_confirm(a.confirm)?;
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     ctx.client.delete_time_entry(&a.entry_id).await?;
     Ok(json!({ "deleted": a.entry_id }))
 }
 
 pub async fn time_in_status(a: TimeInStatusArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     match (&a.task, &a.tasks) {
         (Some(t), None) => Ok(ctx.client.time_in_status(&task_ref(t)?).await?),
         (None, Some(ids)) if !ids.is_empty() => Ok(ctx.client.bulk_time_in_status(ids).await?),
@@ -912,7 +958,7 @@ pub async fn time_in_status(a: TimeInStatusArgs) -> AppResult<Value> {
 // ── reports ──────────────────────────────────────────────────────────────
 
 pub async fn standup(a: StandupArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let s = ops::standup(
         &r,
@@ -938,13 +984,13 @@ pub async fn standup(a: StandupArgs) -> AppResult<Value> {
 }
 
 pub async fn list_summary(a: ListArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     Ok(serde_json::to_value(ops::list_summary(&r, &a.list).await?)?)
 }
 
 pub async fn list_create(a: ListCreateArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let (folder, space) = match (&a.folder, &a.space) {
         (Some(f), _) => (Some(r.folder(f).await?.id), None),
@@ -965,7 +1011,7 @@ pub async fn list_create(a: ListCreateArgs) -> AppResult<Value> {
 }
 
 pub async fn folder_create(a: FolderCreateArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let space = r.space(&a.space).await?;
     let folder = ctx.client.create_folder(&space.id, &a.name).await?;
@@ -976,7 +1022,7 @@ pub async fn folder_create(a: FolderCreateArgs) -> AppResult<Value> {
 // ── docs ─────────────────────────────────────────────────────────────────
 
 pub async fn doc_search(a: DocSearchArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let docs = ctx
         .client
         .search_docs(a.query.as_deref(), a.limit.unwrap_or(50).max(1))
@@ -988,7 +1034,7 @@ pub async fn doc_search(a: DocSearchArgs) -> AppResult<Value> {
 }
 
 pub async fn doc_get(a: DocGetArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     match &a.page_id {
         Some(p) => Ok(ctx.client.doc_page(&a.doc_id, p).await?),
         None => {
@@ -1000,12 +1046,12 @@ pub async fn doc_get(a: DocGetArgs) -> AppResult<Value> {
 }
 
 pub async fn doc_pages(a: DocIdArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     Ok(ctx.client.doc_pages(&a.doc_id).await?)
 }
 
 pub async fn doc_create(a: DocCreateArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let parent = match (
         a.parent_type.as_deref().map(str::to_ascii_lowercase),
@@ -1029,7 +1075,7 @@ pub async fn doc_create(a: DocCreateArgs) -> AppResult<Value> {
 }
 
 pub async fn doc_page_create(a: DocPageCreateArgs) -> AppResult<Value> {
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     Ok(ctx
         .client
         .create_doc_page(
@@ -1048,7 +1094,7 @@ pub async fn doc_page_update(a: DocPageUpdateArgs) -> AppResult<Value> {
             "mode must be replace, append or prepend",
         ));
     }
-    let ctx = Ctx::load()?;
+    let ctx = Ctx::load(&a.account).await?;
     Ok(ctx
         .client
         .edit_doc_page(

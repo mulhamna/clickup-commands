@@ -14,6 +14,8 @@ use clickupc_core::{config::ClickUpConfig, ClickUpClient, Resolver};
 #[derive(Debug, Clone)]
 pub struct Ctx {
     pub profile: Option<String>,
+    /// `--workspace`: name or id overriding the profile's workspace.
+    pub workspace: Option<String>,
     pub json: bool,
     pub yes: bool,
     pub refresh: bool,
@@ -41,9 +43,18 @@ impl Ctx {
         Ok(ClickUpConfig::load_profile(self.profile.as_deref())?)
     }
 
-    pub fn session(&self) -> Result<Session> {
-        let cfg = self.config()?;
-        let client = ClickUpClient::new(&cfg)?;
+    pub async fn session(&self) -> Result<Session> {
+        let mut cfg = self.config()?;
+        let mut client = ClickUpClient::new(&cfg)?;
+        if let Some(w) = &self.workspace {
+            let id = if !w.is_empty() && w.chars().all(|c| c.is_ascii_digit()) {
+                w.clone()
+            } else {
+                client.find_workspace(w).await?.id
+            };
+            cfg.workspace_id = Some(id.clone());
+            client = client.with_workspace(id);
+        }
         Ok(Session {
             cfg,
             client,

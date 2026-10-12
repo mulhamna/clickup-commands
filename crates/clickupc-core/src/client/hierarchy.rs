@@ -53,6 +53,28 @@ impl ClickUpClient {
             .teams)
     }
 
+    /// Find an authorized workspace by id or (case-insensitive) name.
+    pub async fn find_workspace(&self, input: &str) -> Result<Workspace> {
+        let input = input.trim();
+        let all = self.workspaces().await?;
+        if let Some(w) = all
+            .iter()
+            .find(|w| w.id == input || w.name.eq_ignore_ascii_case(input))
+        {
+            return Ok(w.clone());
+        }
+        let names: Vec<String> = all.iter().map(|w| w.name.clone()).collect();
+        let mut suggestions = crate::resolve::suggest(input, &names);
+        if suggestions.is_empty() {
+            suggestions = names;
+        }
+        Err(crate::ClickUpError::resolve(
+            "workspace",
+            input,
+            suggestions,
+        ))
+    }
+
     /// Members of the current workspace (from `GET /v2/team`).
     pub async fn workspace_members(&self) -> Result<Vec<User>> {
         let id = self.workspace_id()?.to_string();

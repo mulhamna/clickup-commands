@@ -9,11 +9,10 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use clap::{Subcommand, ValueEnum};
-use clickupc_core::config::ClickUpConfig;
-use kurir::{
-    doctor as kurir_doctor, register, registration::snippet_for, Harness, RegistrationOptions,
-    Scope, ServerSpec,
-};
+use clickupc_core::config::{mask_token, ClickUpConfig, ConfigFile};
+
+use super::Ctx;
+use kurir::{doctor as kurir_doctor, register, Harness, RegistrationOptions, Scope, ServerSpec};
 
 #[derive(Debug, Subcommand)]
 pub enum McpCmd {
@@ -28,12 +27,13 @@ pub enum McpCmd {
         #[arg(long, default_value = "/mcp")]
         path: String,
     },
-    /// Register `clickupc mcp serve` in an MCP client's config.
+    /// Register `clickupc mcp serve` in MCP clients' configs.
     ///
-    /// Omit `--client` to pick interactively.
+    /// Omit `--client` to pick clients and profiles interactively.
     Install {
-        #[arg(long, value_enum)]
-        client: Option<McpClient>,
+        /// Client to register with; repeat for several
+        #[arg(long = "client", value_enum)]
+        clients: Vec<McpClient>,
         /// Server entry name. Defaults to `clickupc` so it never collides
         /// with ClickUp's official server, which clients usually call `clickup`.
         #[arg(long, default_value = "clickupc")]
@@ -41,9 +41,10 @@ pub enum McpCmd {
         /// Binary to register (default: clickupc on PATH)
         #[arg(long, default_value = "clickupc")]
         command: String,
-        /// Pin a clickupc profile via CLICKUP_PROFILE in the entry
+        /// Pin a clickupc profile via CLICKUP_PROFILE; repeat for several
+        /// (each gets its own `<name>-<profile>` entry)
         #[arg(long = "server-profile")]
-        server_profile: Option<String>,
+        server_profiles: Vec<String>,
         /// Print what would be written
         #[arg(long)]
         print: bool,
@@ -168,7 +169,7 @@ impl std::fmt::Display for McpClient {
     }
 }
 
-pub async fn run(cmd: McpCmd) -> Result<()> {
+pub async fn run(ctx: &Ctx, cmd: McpCmd) -> Result<()> {
     match cmd {
         McpCmd::Serve {
             transport,
@@ -187,67 +188,230 @@ pub async fn run(cmd: McpCmd) -> Result<()> {
             }
         },
         McpCmd::Install {
-            client,
+            clients,
             name,
             command,
-            server_profile,
+            server_profiles,
             print,
             dry_run,
             force,
         } => {
-            let client = match client {
-                Some(c) => c,
-                None => pick_client(&command)?,
-            };
-            install(
-                client,
-                &name,
-                &command,
-                server_profile.as_deref(),
-                print,
-                dry_run,
-                force,
-            )
+            if clients.is_empty() {
+                let plan = interactive_setup(ctx, &command).await?;
+                install_all(
+                    &plan.clients,
+                    &plan.profiles,
+                    &name,
+                    &plan.command,
+                    print,
+                    dry_run,
+                    force,
+                )
+            } else {
+                install_all(
+                    &clients,
+                    &server_profiles,
+                    &name,
+                    &command,
+                    print,
+                    dry_run,
+                    force,
+                )
+            }
         }
         McpCmd::Doctor { client, command } => doctor(client, &command),
     }
 }
 
-fn pick_client(command: &str) -> Result<McpClient> {
+/// What the interactive flow decided to install.
+pub struct InstallPlan {
+    pub clients: Vec<McpClient>,
+    pub profiles: Vec<String>,
+    pub command: String,
+}
+
+fn has_credentials() -> bool {
+    ClickUpConfig::load()
+        .map(|c| c.token.is_some() && c.workspace_id.is_some())
+        .unwrap_or(false)
+}
+
+/// Banner, prerequisite checklist (logging in on the spot if needed), then
+/// multi-select for clients and — with several profiles — for profiles.
+pub async fn interactive_setup(ctx: &Ctx, command: &str) -> Result<InstallPlan> {
     crate::output::require_tty("MCP client", "--client <target>")?;
     println!("{}", crate::help_text::BANNER.trim_end());
     println!();
     println!("clickupc mcp install — interactive setup");
     println!("────────────────────────────────────────");
-    match resolve_command_path(command) {
-        Some(p) => println!("[ok]   clickupc binary:  {}", p.display()),
-        None => println!("[warn] '{command}' is not on PATH (pass --command /path/to/clickupc)"),
-    }
-    let cfg = ClickUpConfig::load().ok();
-    match &cfg {
-        Some(c) if c.token.is_some() && c.workspace_id.is_some() => println!(
-            "[ok]   ClickUp auth:     profile '{}', workspace {}",
-            c.profile,
-            c.workspace_id.as_deref().unwrap_or_default()
-        ),
-        Some(c) if c.token.is_some() => {
-            println!("[fail] ClickUp auth:     token present, no workspace selected")
+
+    // Binary: prefer what's on PATH, else this very executable.
+    let command = match resolve_command_path(command) {
+        Some(p) => {
+            println!("[ok]   clickupc binary:  {}", p.display());
+            p.display().to_string()
         }
-        _ => println!("[fail] ClickUp auth:     no token configured"),
+        None => {
+            let exe = env::current_exe().context("cannot locate the clickupc executable")?;
+            println!(
+                "[warn] '{command}' is not on PATH; registering {}",
+                exe.display()
+            );
+            exe.display().to_string()
+        }
+    };
+
+    if !has_credentials() {
+        println!("[fail] ClickUp auth:     no token / workspace configured");
+        println!();
+        println!("The MCP server needs a ClickUp token first — starting `clickupc auth login`.");
+        println!();
+        Box::pin(super::auth::login(ctx, None, false)).await?;
+        println!();
     }
-    if !cfg
-        .as_ref()
-        .is_some_and(|c| c.token.is_some() && c.workspace_id.is_some())
-    {
-        bail!(
-            "ClickUp credentials are not set up yet. Run:\n\n  clickupc auth login\n\nthen re-run `clickupc mcp install`."
-        );
+    let file = ConfigFile::load()?;
+    let names: Vec<String> = file
+        .profiles
+        .iter()
+        .filter(|(_, p)| p.token.is_some() && p.workspace_id.is_some())
+        .map(|(n, _)| n.clone())
+        .collect();
+    if names.is_empty() {
+        bail!("no usable profile; run `clickupc auth login` and try again");
     }
+    println!(
+        "[ok]   ClickUp auth:     {} profile(s): {}",
+        names.len(),
+        names.join(", ")
+    );
     println!();
-    inquire::Select::new("Pick the MCP client to install into:", ALL_CLIENTS.to_vec())
-        .with_page_size(17)
+
+    let clients = inquire::MultiSelect::new(
+        "Install into which MCP clients? (space to toggle, enter to confirm)",
+        ALL_CLIENTS.to_vec(),
+    )
+    .with_page_size(17)
+    .with_validator(|picked: &[inquire::list_option::ListOption<&McpClient>]| {
+        Ok(if picked.is_empty() {
+            inquire::validator::Validation::Invalid("pick at least one client".into())
+        } else {
+            inquire::validator::Validation::Valid
+        })
+    })
+    .prompt()
+    .context("MCP client selection cancelled")?;
+
+    let profiles = if names.len() == 1 {
+        names
+    } else {
+        let current = file.selected_profile_name();
+        let labels: Vec<String> = names
+            .iter()
+            .map(|n| {
+                let p = &file.profiles[n];
+                format!(
+                    "{n}  (workspace {} · {})",
+                    p.workspace_id.as_deref().unwrap_or("none"),
+                    p.token.as_deref().map(mask_token).unwrap_or_default()
+                )
+            })
+            .collect();
+        let default: Vec<usize> = names
+            .iter()
+            .position(|n| *n == current)
+            .into_iter()
+            .collect();
+        let picked = inquire::MultiSelect::new(
+            "Which profiles? Each becomes its own server entry (space to toggle)",
+            labels.clone(),
+        )
+        .with_default(&default)
+        .with_validator(|picked: &[inquire::list_option::ListOption<&String>]| {
+            Ok(if picked.is_empty() {
+                inquire::validator::Validation::Invalid("pick at least one profile".into())
+            } else {
+                inquire::validator::Validation::Valid
+            })
+        })
         .prompt()
-        .context("MCP client selection cancelled")
+        .context("profile selection cancelled")?;
+        picked
+            .iter()
+            .filter_map(|l| labels.iter().position(|x| x == l).map(|i| names[i].clone()))
+            .collect()
+    };
+    Ok(InstallPlan {
+        clients,
+        profiles,
+        command,
+    })
+}
+
+/// Snippet meant to be pasted as-is. kurir's own snippet redacts every env
+/// value; ours only ever holds CLICKUP_PROFILE (a profile name, not a
+/// secret), so print it verbatim or the pasted entry would be broken.
+pub fn copyable_snippet(spec: &ServerSpec) -> serde_json::Value {
+    let mut entry = serde_json::json!({
+        "command": spec.command,
+        "args": spec.args,
+    });
+    if !spec.env.is_empty() {
+        entry["env"] = serde_json::json!(spec.env);
+    }
+    serde_json::json!({ "mcpServers": { spec.name.clone(): entry } })
+}
+
+/// Install an interactive plan with the default entry name.
+pub fn install_plan(plan: &InstallPlan) -> Result<()> {
+    install_all(
+        &plan.clients,
+        &plan.profiles,
+        DEFAULT_ENTRY_NAME,
+        &plan.command,
+        false,
+        false,
+        false,
+    )
+}
+
+pub const DEFAULT_ENTRY_NAME: &str = "clickupc";
+
+/// Entry name: the base name for zero/one profile, `<base>-<profile>` for several.
+pub fn entry_name(base: &str, profile: Option<&str>, profile_count: usize) -> String {
+    match profile {
+        Some(p) if profile_count > 1 => format!("{base}-{p}"),
+        _ => base.to_string(),
+    }
+}
+
+fn install_all(
+    clients: &[McpClient],
+    profiles: &[String],
+    name: &str,
+    command: &str,
+    print: bool,
+    dry_run: bool,
+    force: bool,
+) -> Result<()> {
+    let targets: Vec<Option<&str>> = if profiles.is_empty() {
+        vec![None]
+    } else {
+        profiles.iter().map(|p| Some(p.as_str())).collect()
+    };
+    let mut failed = 0;
+    for client in clients {
+        for profile in &targets {
+            let entry = entry_name(name, *profile, profiles.len());
+            if let Err(e) = install(*client, &entry, command, *profile, print, dry_run, force) {
+                failed += 1;
+                eprintln!("[fail] {entry} → {client}: {e:#}");
+            }
+        }
+    }
+    if failed > 0 {
+        bail!("{failed} MCP registration(s) failed");
+    }
+    Ok(())
 }
 
 pub fn server_spec(name: &str, command: String, profile: Option<&str>) -> ServerSpec {
@@ -272,7 +436,10 @@ fn install(
     let spec = server_spec(name, resolved, profile);
 
     if harness.is_snippet_only() {
-        println!("{}", serde_json::to_string_pretty(&snippet_for(&spec))?);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&copyable_snippet(&spec))?
+        );
         return Ok(());
     }
     let options = RegistrationOptions {
@@ -284,7 +451,10 @@ fn install(
     };
     let result = register(harness, &spec, &options).context("MCP registration failed")?;
     if result.changed {
-        println!("Installed MCP entry '{name}' for {harness}.");
+        let pinned = profile
+            .map(|p| format!(" (profile {p})"))
+            .unwrap_or_default();
+        println!("[ok]   Installed '{name}'{pinned} for {harness}.");
     } else if result.action == "already-configured" {
         println!("MCP entry '{name}' is already configured (use --force to overwrite).");
     } else if dry_run {
@@ -391,6 +561,7 @@ fn executable_candidates(path: &Path) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kurir::registration::snippet_for;
 
     #[test]
     fn spec_runs_mcp_serve_without_token() {
@@ -405,6 +576,11 @@ mod tests {
         let json = serde_json::to_string(&snippet_for(&spec)).unwrap();
         assert!(!json.contains("pk_"));
         assert!(!json.contains("CLICKUP_TOKEN"));
+        let pasted = copyable_snippet(&spec);
+        assert_eq!(
+            pasted["mcpServers"]["clickupc"]["env"]["CLICKUP_PROFILE"],
+            serde_json::json!("work")
+        );
     }
 
     #[test]

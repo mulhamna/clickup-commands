@@ -4,7 +4,7 @@
 [![CI](https://github.com/mulhamna/clickup-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/clickup-commands/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/mulhamna/clickup-commands/blob/main/LICENSE)
 
-**ClickUp from your terminal — and from your AI agent.** A fast native CLI plus an MCP server with 55 tools, in one binary.
+**ClickUp from your terminal — and from your AI agent.** A fast native CLI plus an MCP server with 56 tools, in one binary.
 
 ```bash
 npm i -g @mulham28/clickupc
@@ -25,7 +25,7 @@ clickupc standup
 
 - **Names, not ids** — lists, statuses, people (`me`, username, email) and custom fields resolved for you, with typo suggestions.
 - **Human dates** — `fri`, `tomorrow`, `+3d`, `eow`, `2026-10-20 14:00`.
-- **MCP server** — `clickupc mcp serve` gives Claude, Cursor, Codex, Gemini CLI, VS Code and others 55 `clickup_*` tools: tasks, bulk, comments, custom fields, relations, time tracking, reports and Docs. Deletes require explicit confirmation.
+- **MCP server** — `clickupc mcp serve` gives Claude, Cursor, Codex, Gemini CLI, VS Code and others 56 `clickup_*` tools: tasks, bulk, comments, custom fields, relations, time tracking, reports and Docs. Deletes require explicit confirmation.
 - **No daily cap** — talks to the ClickUp Public API with your personal token, so only the per-minute rate limit applies; 429s are retried automatically.
 
 ## Use it from an MCP client

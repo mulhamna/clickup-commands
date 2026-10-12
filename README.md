@@ -10,7 +10,7 @@
 ```
 
 **ClickUp from your terminal — and from your AI agent.**
-One Rust binary: a fast CLI for humans and scripts, plus an MCP server with 55 tools.
+One Rust binary: a fast CLI for humans and scripts, plus an MCP server with 56 tools.
 
 [![CI](https://github.com/mulhamna/clickup-commands/actions/workflows/ci.yml/badge.svg)](https://github.com/mulhamna/clickup-commands/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/clickupc.svg?label=crates.io)](https://crates.io/crates/clickupc)
@@ -39,7 +39,8 @@ error: Could not resolve status 'in reveiw' (did you mean: in review?)
 - **Names, not ids.** Lists, statuses, people (`me`, username, email), custom fields and dropdown options are resolved for you — with "did you mean" suggestions and a hard error on ambiguous names, never a silent guess.
 - **Human dates.** `--due fri`, `--due "2026-10-20 14:00"`, `--updated-after -2w`, `--due-before eow`, `--estimate 1h30m`.
 - **Built for the 100 req/min budget.** Hierarchy and fields are cached, 429s are retried after `X-RateLimit-Reset`, and bulk work runs with bounded concurrency.
-- **Agent-ready.** `clickupc mcp serve` exposes 55 typed `clickup_*` tools to Claude, Cursor, Codex, Gemini CLI, VS Code and more; `clickupc mcp install` registers it in one command.
+- **Agent-ready.** `clickupc mcp serve` exposes 56 typed `clickup_*` tools to Claude, Cursor, Codex, Gemini CLI, VS Code and more; `clickupc mcp install` registers it in one command.
+- **Multiple accounts.** One profile per token; switch with `--profile`, hop workspaces with `--workspace`, and let an agent pick the account per tool call.
 - **Safe by default.** Deletes confirm on the CLI (`--yes` to skip) and require `confirm: true` over MCP. Your token is never printed, logged or written into client configs.
 - **Scriptable.** `--json` on every read command, stable exit codes, and a raw `clickupc api` escape hatch for anything not wrapped yet.
 
@@ -184,8 +185,8 @@ Full spec: [docs/CLI.md](docs/CLI.md).
 `clickupc mcp serve` speaks MCP over **stdio** (default) or **Streamable HTTP** (`--transport streamable-http --port 8787`). It reads the same config and token as the CLI.
 
 ```bash
-clickupc mcp install --client claude-code   # also: claude-desktop, cursor, codex, gemini-cli, vscode,
-                                            # copilot-cli, opencode, windsurf, zed, … (17 targets)
+clickupc mcp install                        # pick clients and profiles with checkboxes (logs you in first if needed)
+clickupc mcp install --client claude-code --client cursor --server-profile work --server-profile personal
 clickupc mcp doctor                         # binary on PATH, credentials, client config
 ```
 
@@ -201,7 +202,7 @@ Or add it by hand:
 
 | Area | Tools |
 | --- | --- |
-| Account & hierarchy | `auth_status`, `whoami`, `workspace_list`, `hierarchy`, `list_get`, `list_create`, `folder_create`, `member_list`, `member_resolve` |
+| Account & hierarchy | `profile_list`, `auth_status`, `whoami`, `workspace_list`, `hierarchy`, `list_get`, `list_create`, `folder_create`, `member_list`, `member_resolve` |
 | Tasks | `task_search`, `task_get`, `task_create`, `task_update`, `task_set_status`, `task_move`, `task_delete`, `task_add_to_list`, `task_remove_from_list` |
 | Bulk | `task_bulk_create`, `task_bulk_update`, `task_batch` |
 | Comments | `comment_list`, `comment_add`, `comment_update`, `comment_delete`, `comment_replies`, `comment_reply` |
@@ -212,7 +213,7 @@ Or add it by hand:
 | Docs | `doc_search`, `doc_get`, `doc_pages`, `doc_create`, `doc_page_create`, `doc_page_update` |
 | Escape hatch | `api_request` |
 
-The entry is named `clickupc`, so it sits next to ClickUp's official server (usually registered as `clickup`) without clashing; pick another name with `--name`. All tool names are prefixed `clickup_`. Inputs take names or ids and human dates; task results are compact by default (`detail: "full"` for everything) so they don't flood the model's context. Destructive tools fail with `unsafe_operation` unless `confirm: true`, and errors carry stable codes (`resolve_error` with suggestions, `clickup_api_error` with the ClickUp `ECODE`, `rate_limited` with the reset time). Details: [docs/MCP.md](docs/MCP.md).
+The entry is named `clickupc`, so it sits next to ClickUp's official server (usually registered as `clickup`) without clashing; pick another name with `--name`. All tool names are prefixed `clickup_`. Inputs take names or ids and human dates, plus optional `profile` / `workspace` to switch account or workspace per call; task results are compact by default (`detail: "full"` for everything) so they don't flood the model's context. Destructive tools fail with `unsafe_operation` unless `confirm: true`, and errors carry stable codes (`resolve_error` with suggestions, `clickup_api_error` with the ClickUp `ECODE`, `rate_limited` with the reset time). Details: [docs/MCP.md](docs/MCP.md).
 
 ## Configuration
 
@@ -249,7 +250,21 @@ Environment variables override the profile:
 | `CLICKUP_TIMEOUT_SECS` | HTTP timeout |
 | `CLICKUP_TASK_LIMIT` | Default cap for list-like commands |
 
-Global flags: `--profile`, `--json`, `--refresh` (bypass caches), `-y/--yes`, `-v/--verbose`.
+Global flags: `--profile`, `--workspace`, `--json`, `--refresh` (bypass caches), `-y/--yes`, `-v/--verbose`.
+
+### Multiple accounts and workspaces
+
+Each profile holds one personal token and a default workspace. A token already reaches every workspace its user belongs to, so use profiles for different ClickUp **users** and `--workspace` for different **workspaces**.
+
+```bash
+clickupc auth login                         # on a terminal: add a new profile or update an existing one
+clickupc auth profile list
+clickupc auth profile use                   # picker
+clickupc --profile personal task list --mine
+clickupc --workspace "Side Project" task list --mine
+```
+
+For agents, `clickupc mcp install` lets you tick several profiles; each becomes its own server entry (`clickupc-work`, `clickupc-personal`) pinned to that account. Every tool also accepts optional `profile` and `workspace` arguments, and `clickup_profile_list` shows what's available.
 Exit codes: `0` ok · `1` error · `2` invalid input · `3` auth · `4` not found / unresolved name · `5` rate limited.
 
 ## Security

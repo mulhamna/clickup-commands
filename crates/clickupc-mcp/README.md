@@ -8,7 +8,7 @@ The ClickUp [Model Context Protocol](https://modelcontextprotocol.io) server beh
 
 > **Just want to use it?** Install the [`clickupc`](https://crates.io/crates/clickupc) binary and run `clickupc mcp install` — this crate is for embedding the server in your own Rust program.
 
-- **55 `clickup_*` tools** — tasks, bulk & batch, comments, custom fields, tags / links / dependencies, checklists, attachments, time tracking, reports, Docs, and a raw API escape hatch.
+- **56 `clickup_*` tools** — tasks, bulk & batch, comments, custom fields, tags / links / dependencies, checklists, attachments, time tracking, reports, Docs, and a raw API escape hatch.
 - **Model-friendly inputs** — names or ids for lists, statuses, members, fields and options; dates like `tomorrow`, `+3d`, `eow`.
 - **Compact outputs** — task summaries by default (`detail: "full"` on request), responses bounded to stay under stdio line limits.
 - **Safe** — delete / remove / clear tools return `unsafe_operation` unless `confirm: true`.
