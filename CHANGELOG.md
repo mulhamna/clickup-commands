@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.0](https://github.com/mulhamna/clickup-commands/compare/v1.0.2...v1.1.0) (2026-10-12)
+
+
+### Features
+
+* **cli:** multi-account login, --workspace and multi-target mcp install ([e9d54f4](https://github.com/mulhamna/clickup-commands/commit/e9d54f4cad45a7c9b6233259936ad112a312e9bd))
+* **core:** look up workspaces by name and suggest profile names ([75bdf7e](https://github.com/mulhamna/clickup-commands/commit/75bdf7ecbd6e4f969dffe1f43839a9b04a7f273a))
+* **mcp:** let every tool target a profile and workspace ([9bd9d6a](https://github.com/mulhamna/clickup-commands/commit/9bd9d6a55f561215e1edc005eb658644e8da3738))
+* multiple accounts, workspaces and multi-client MCP install ([8a86bc3](https://github.com/mulhamna/clickup-commands/commit/8a86bc3ffbe62a388b7c1d6bf9517d0a14d2af89))
+
+
+### Bug Fixes
+
+* **cli:** keep CLICKUP_PROFILE as the first-login profile ([5989fbd](https://github.com/mulhamna/clickup-commands/commit/5989fbde9bd6ee718776ef54a432d0c4184b21c5))
+* **cli:** register the MCP server as clickupc by default ([e4ad572](https://github.com/mulhamna/clickup-commands/commit/e4ad572e668eb36d252a30a416bcd490a3e7b705))
+* **cli:** register the MCP server as clickupc by default ([e32e485](https://github.com/mulhamna/clickup-commands/commit/e32e485c0c00a6d1c3c2c7fde053f539aed06522))
+
 ## [1.0.2](https://github.com/mulhamna/clickup-commands/compare/v1.0.1...v1.0.2) (2026-10-12)
 
 
