@@ -272,11 +272,12 @@ mod tests {
         p.token = Some("pk_abc".into());
         p.workspace_id = Some("901".into());
         p.aliases.insert("sprint".into(), "123".into());
-        let path = file.save().unwrap();
+        let _path = file.save().unwrap();
         assert_eq!(ConfigFile::load().unwrap(), file);
 
         #[cfg(unix)]
         {
+            let path = _path;
             use std::os::unix::fs::PermissionsExt;
             let mode = std::fs::metadata(path).unwrap().permissions().mode();
             assert_eq!(mode & 0o777, 0o600);
