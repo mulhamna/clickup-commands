@@ -52,6 +52,11 @@ impl Zone {
     }
 }
 
+/// True for IANA names like `Asia/Jakarta` or `UTC`.
+pub fn is_valid_tz(name: &str) -> bool {
+    name.parse::<Tz>().is_ok()
+}
+
 pub fn now_ms() -> i64 {
     Utc::now().timestamp_millis()
 }
@@ -313,6 +318,13 @@ mod tests {
         assert_eq!(format_duration(7_200_000), "2h");
         assert_eq!(format_duration(30_000), "30s");
         assert_eq!(format_duration(0), "0m");
+    }
+
+    #[test]
+    fn timezones() {
+        assert!(is_valid_tz("Asia/Jakarta"));
+        assert!(is_valid_tz("UTC"));
+        assert!(!is_valid_tz("Mars/Olympus"));
     }
 
     #[test]
