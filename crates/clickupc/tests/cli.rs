@@ -276,3 +276,33 @@ async fn login_from_stdin_into_new_profile() {
     );
     assert!(cfg.contains("current_profile = \"side\""), "{cfg}");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn first_login_honors_clickup_profile_env() {
+    let server = MockServer::start().await;
+    Mock::given(path("/v2/user"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "user": { "id": 5, "username": "ana" } })),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(path("/v2/team"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "teams": [{ "id": "777", "name": "Acme" }] })),
+        )
+        .mount(&server)
+        .await;
+    let env = Env::new(None);
+    let mut cmd = env.cmd(&["auth", "login", "--token", "pk_env_profile_1"]);
+    cmd.env("CLICKUP_BASE_URL", server.uri())
+        .env("CLICKUP_PROFILE", "work");
+    let o = tokio::task::spawn_blocking(move || cmd.output().unwrap())
+        .await
+        .unwrap();
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let cfg = std::fs::read_to_string(env.dir.path().join("config/config.toml")).unwrap();
+    assert!(cfg.contains("[profiles.work]"), "{cfg}");
+    assert!(!cfg.contains("[profiles.default]"), "{cfg}");
+}

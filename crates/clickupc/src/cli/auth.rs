@@ -61,8 +61,6 @@ pub enum ConfigCmd {
     Set { key: String, value: String },
 }
 
-const DEFAULT_NEW_PROFILE: &str = "default";
-
 fn profile_name(ctx: &Ctx, file: &ConfigFile) -> String {
     ctx.profile
         .clone()
@@ -114,7 +112,8 @@ pub async fn login(ctx: &Ctx, token: Option<String>, offer_mcp: bool) -> Result<
     let target = match &ctx.profile {
         Some(p) if file.profiles.contains_key(p) => Target::Existing(p.clone()),
         Some(p) => Target::New(Some(p.clone())),
-        None if !had_profiles => Target::New(Some(DEFAULT_NEW_PROFILE.into())),
+        // First login: CLICKUP_PROFILE, else `default` (unchanged behaviour).
+        None if !had_profiles => Target::New(Some(file.selected_profile_name())),
         None if is_tty() => {
             const NEW: &str = "+ New profile";
             let mut options = vec![NEW.to_string()];
