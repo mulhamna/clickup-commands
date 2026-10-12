@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/mulhamna/clickup-commands/compare/v1.0.0...v1.0.1) (2026-10-12)
+
+
+### Bug Fixes
+
+* **ci:** accept first-release CHANGELOG heading in release validation ([1a68791](https://github.com/mulhamna/clickup-commands/commit/1a687910a440ff8bb48c226c98664357abc09ac6))
+* **ci:** accept the first-release CHANGELOG heading in release validation ([4b03557](https://github.com/mulhamna/clickup-commands/commit/4b0355756cf1729fc5e7241c475b3ae0067639dd))
+
 ## 1.0.0 (2026-10-12)
 
 
