@@ -14,34 +14,34 @@ Commit per task with Conventional Commits (`feat(core): …`, `feat(cli): …`, 
 
 ## Phase 0 — Scaffold
 
-- [ ] Cargo workspace with `crates/clickupc-core` (lib), `crates/clickupc-mcp` (lib, no binary), `crates/clickupc` (the only binary) (names per `CLAUDE.md`). Edition 2021, `license = "MIT OR Apache-2.0"`, version `0.1.0` in `[workspace.package]`, shared deps in `[workspace.dependencies]`.
-- [ ] Dependencies (match jira-commands versions where they overlap): `reqwest` (rustls, json, multipart), `tokio`, `serde`, `serde_json`, `figment`, `toml`, `dirs`, `thiserror`, `anyhow`, `tracing`, `chrono`, `chrono-tz`, `url`, `strsim`, `mime_guess`; CLI: `clap`, `inquire`, `indicatif`, `open`, `comfy-table`; MCP: `rmcp` (same features as jira-mcp), `schemars`, `axum`, `tracing-subscriber`; dev: `wiremock`, `tempfile`, `serial_test`.
-- [ ] `LICENSE-MIT`, `LICENSE-APACHE`, `LICENSE`, `.gitignore`, `README.md`, `CLAUDE.md`, `AGENTS.md`.
-- [ ] CI: copy `ci.yml` (fmt/clippy/test/build matrix), `security.yml`, `deny.toml`, `dependabot.yml` from jira-commands; rename crates.
-- [ ] `clickupc --version` runs; `clickupc mcp serve` starts and answers `initialize` over stdio (empty tool list is fine).
+- [x] Cargo workspace with `crates/clickupc-core` (lib), `crates/clickupc-mcp` (lib, no binary), `crates/clickupc` (the only binary) (names per `CLAUDE.md`). Edition 2021, `license = "MIT"`, version `0.1.0` in `[workspace.package]`, shared deps in `[workspace.dependencies]`.
+- [x] Dependencies (match jira-commands versions where they overlap): `reqwest` (rustls, json, multipart), `tokio`, `serde`, `serde_json`, `figment`, `toml`, `dirs`, `thiserror`, `anyhow`, `tracing`, `chrono`, `chrono-tz`, `url`, `strsim`, `mime_guess`; CLI: `clap`, `inquire`, `indicatif`, `open`, `comfy-table`; MCP: `rmcp` (same features as jira-mcp), `schemars`, `axum`, `tracing-subscriber`; dev: `wiremock`, `tempfile`, `serial_test`.
+- [x] `LICENSE` (MIT), `.gitignore`, `README.md`, `CLAUDE.md`, `AGENTS.md`.
+- [x] CI: copy `ci.yml` (fmt/clippy/test/build matrix), `security.yml`, `deny.toml`, `dependabot.yml` from jira-commands; rename crates.
+- [x] `clickupc --version` runs; `clickupc mcp serve` starts and answers `initialize` over stdio (empty tool list is fine).
 
 **Accept:** workspace builds on CI matrix; exactly one binary is produced.
 
 ## Phase 1 — Core foundation + auth + hierarchy
 
 Core:
-- [ ] `config.rs`: profiles, env overrides, chmod-600 warning, save/load round-trip. Tests ported from `config_auth_priority.rs`.
-- [ ] `error.rs`: `ClickUpError` per ARCHITECTURE.
-- [ ] `client/mod.rs`: `ClickUpClient`, v2/v3 helpers, `Query` builder (repeated `key[]=`), error-body parsing (v2 + v3), token redaction in debug logs.
-- [ ] `rate_limit.rs`: header tracking, proactive wait, 429 retry ×3 with jitter, shared `Arc`, bounded concurrency.
-- [ ] `model/`: user, workspace (+members), space, folder, list (+statuses), status. `string_or_i64` helper.
-- [ ] `client/hierarchy.rs` + `client/member.rs`: user, workspaces, spaces, folders, lists (foldered + folderless), list detail, list members.
-- [ ] `resolve.rs`: list/space/folder/member resolution, qualified paths, aliases, fuzzy suggestions, ambiguity error, disk cache with TTL + refresh-on-miss.
-- [ ] `time.rs`: `parse_when`, `parse_duration`, display helpers.
+- [x] `config.rs`: profiles, env overrides, chmod-600 warning, save/load round-trip. Tests ported from `config_auth_priority.rs`.
+- [x] `error.rs`: `ClickUpError` per ARCHITECTURE.
+- [x] `client/mod.rs`: `ClickUpClient`, v2/v3 helpers, `Query` builder (repeated `key[]=`), error-body parsing (v2 + v3), token redaction in debug logs.
+- [x] `rate_limit.rs`: header tracking, proactive wait, 429 retry ×3 with jitter, shared `Arc`, bounded concurrency.
+- [x] `model/`: user, workspace (+members), space, folder, list (+statuses), status. `string_or_i64` helper.
+- [x] `client/hierarchy.rs` + `client/member.rs`: user, workspaces, spaces, folders, lists (foldered + folderless), list detail, list members.
+- [x] `resolve.rs`: list/space/folder/member resolution, qualified paths, aliases, fuzzy suggestions, ambiguity error, disk cache with TTL + refresh-on-miss.
+- [x] `time.rs`: `parse_when`, `parse_duration`, display helpers.
 
 CLI:
-- [ ] `auth login|status|logout|profile`, `whoami`, `workspace list|use`, `tree`, `space list`, `folder list`, `list list|view`, `member list|find`, `alias`, `cache clear`, `config get|set`, `api`.
-- [ ] `--json` on every read command; exit codes per ARCHITECTURE.
+- [x] `auth login|status|logout|profile`, `whoami`, `workspace list|use`, `tree`, `space list`, `folder list`, `list list|view`, `member list|find`, `alias`, `cache clear`, `config get|set`, `api`.
+- [x] `--json` on every read command; exit codes per ARCHITECTURE.
 
 MCP:
-- [ ] `clickupc-mcp/src/lib.rs` ported (stdio + streamable HTTP); `clickupc mcp serve` wired to it; stdout kept clean in stdio mode (test: no bytes on stdout before `initialize`).
-- [ ] `error.rs`, `app/shared.rs` ported.
-- [ ] Tools: `clickup_auth_status`, `clickup_whoami`, `clickup_workspace_list`, `clickup_hierarchy`, `clickup_list_get`, `clickup_member_list`, `clickup_member_resolve`, `clickup_api_request`.
+- [x] `clickupc-mcp/src/lib.rs` ported (stdio + streamable HTTP); `clickupc mcp serve` wired to it; stdout kept clean in stdio mode (test: no bytes on stdout before `initialize`).
+- [x] `error.rs`, `app/shared.rs` ported.
+- [x] Tools: `clickup_auth_status`, `clickup_whoami`, `clickup_workspace_list`, `clickup_hierarchy`, `clickup_list_get`, `clickup_member_list`, `clickup_member_resolve`, `clickup_api_request`.
 
 **Accept:**
 - wiremock tests: auth header is raw `pk_` (no Bearer); 429 then 200 succeeds; 429 ×4 → `RateLimit`; v2 and v3 error bodies parsed; hierarchy walk issues the expected calls and second run hits cache (zero HTTP).
@@ -51,17 +51,17 @@ MCP:
 ## Phase 2 — Tasks
 
 Core:
-- [ ] `task_ref.rs` + exhaustive unit tests (ids, custom ids, both URL forms, `#` prefix, garbage input).
-- [ ] `model/task.rs` (summary + full), custom field value display.
-- [ ] `filter.rs`: `TaskFilter` → query; endpoint selection; custom_fields JSON encoding.
-- [ ] `client/task.rs`: get, search (pagination: `last_page` or <100, 500-page cap, `limit`), create, update (add/rem shape, always both arrays), delete, set status, move (v3 home_list with status mappings).
-- [ ] `resolve.rs`: status resolution per list (case-insensitive, canonical spelling back), task type resolution.
+- [x] `task_ref.rs` + exhaustive unit tests (ids, custom ids, both URL forms, `#` prefix, garbage input).
+- [x] `model/task.rs` (summary + full), custom field value display.
+- [x] `filter.rs`: `TaskFilter` → query; endpoint selection; custom_fields JSON encoding.
+- [x] `client/task.rs`: get, search (pagination: `last_page` or <100, 500-page cap, `limit`), create, update (add/rem shape, always both arrays), delete, set status, move (v3 home_list with status mappings).
+- [x] `resolve.rs`: status resolution per list (case-insensitive, canonical spelling back), task type resolution.
 
 CLI:
-- [ ] `task list|view|create|update|status|assign|unassign|move|delete|open` per `docs/CLI.md`, all filter flags, interactive pickers on TTY, delete confirmation.
+- [x] `task list|view|create|update|status|assign|unassign|move|delete|open` per `docs/CLI.md`, all filter flags, interactive pickers on TTY, delete confirmation.
 
 MCP:
-- [ ] `clickup_task_search`, `clickup_task_get`, `clickup_task_create`, `clickup_task_update`, `clickup_task_set_status`, `clickup_task_move`, `clickup_task_delete`.
+- [x] `clickup_task_search`, `clickup_task_get`, `clickup_task_create`, `clickup_task_update`, `clickup_task_set_status`, `clickup_task_move`, `clickup_task_delete`.
 
 **Accept:**
 - wiremock tests assert exact query strings for: single-list search (list endpoint), multi-list search (team endpoint), statuses with spaces, `include_closed`, date ranges in ms, custom_fields JSON; pagination stops on `last_page` and on short page.
@@ -73,11 +73,11 @@ MCP:
 ## Phase 3 — Collaboration: comments, attachments, custom fields, relations, time
 
 Core + CLI + MCP for:
-- [ ] Comments: list (cursor pagination), add, update, delete.
-- [ ] Attachments: upload (multipart field `attachment`).
-- [ ] Custom fields: list per list, set (value conversion per type: dropdown/label option names → UUIDs, dates, numbers, money, users add/rem, checkbox, url/email/text), clear. `task create|update --field` wired in.
-- [ ] Tags add/remove, links add/remove, dependencies add/remove.
-- [ ] Time: list, add, start, stop, current, delete (negative duration = running).
+- [x] Comments: list (cursor pagination), add, update, delete.
+- [x] Attachments: upload (multipart field `attachment`).
+- [x] Custom fields: list per list, set (value conversion per type: dropdown/label option names → UUIDs, dates, numbers, money, users add/rem, checkbox, url/email/text), clear. `task create|update --field` wired in.
+- [x] Tags add/remove, links add/remove, dependencies add/remove.
+- [x] Time: list, add, start, stop, current, delete (negative duration = running).
 
 **Accept:**
 - Field value conversion unit-tested for every listed type; unknown option name → `Resolve` error with options.
@@ -86,20 +86,20 @@ Core + CLI + MCP for:
 
 ## Phase 4 — Bulk, checklists, reports, extras
 
-- [ ] Bulk update / bulk comment / batch file (CLI) and `clickup_task_bulk_create`, `clickup_task_bulk_update`, `clickup_task_batch` (MCP): dry-run, confirmation, bounded concurrency, progress bar, per-item results.
-- [ ] Checklists (create, add items, resolve/unresolve).
-- [ ] Threaded comment replies.
-- [ ] TIML add/remove list.
-- [ ] Time in status (single + bulk).
-- [ ] `list create`, `folder create`.
-- [ ] Reports: `standup`, `summary` (CLI) + `clickup_standup`, `clickup_list_summary` (MCP). `time report` aggregation.
+- [x] Bulk update / bulk comment / batch file (CLI) and `clickup_task_bulk_create`, `clickup_task_bulk_update`, `clickup_task_batch` (MCP): dry-run, confirmation, bounded concurrency, progress bar, per-item results.
+- [x] Checklists (create, add items, resolve/unresolve).
+- [x] Threaded comment replies.
+- [x] TIML add/remove list.
+- [x] Time in status (single + bulk).
+- [x] `list create`, `folder create`.
+- [x] Reports: `standup`, `summary` (CLI) + `clickup_standup`, `clickup_list_summary` (MCP). `time report` aggregation.
 
 **Accept:** bulk update of 250 mocked tasks completes with a simulated 429 mid-way and correct final summary; dry-run issues zero mutating requests.
 
 ## Phase 5 — Docs API + MCP install
 
-- [ ] v3 Docs: search, get, pages listing, get pages, create doc, create page, edit page (read the "Docs API limitation" guide first).
-- [ ] `clickupc mcp doctor` and `clickupc mcp install --client …` ported from jira-commands (all client targets).
+- [x] v3 Docs: search, get, pages listing, get pages, create doc, create page, edit page (read the "Docs API limitation" guide first).
+- [x] `clickupc mcp doctor` and `clickupc mcp install --client …` ported from jira-commands (all client targets).
 - [ ] MCP tool descriptions reviewed end-to-end by running the server in Claude Code against a real workspace (owner).
 
 **Accept:** `clickupc mcp install --client claude-code` produces a working server entry without embedding the token.

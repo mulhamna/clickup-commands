@@ -83,4 +83,4 @@ Your token stays in `~/.config/clickupc/config.toml` (or `CLICKUP_TOKEN`); it is
 
 ## License
 
-MIT OR Apache-2.0. ClickUp is a trademark of its owner; this project is not affiliated with or endorsed by ClickUp.
+MIT. ClickUp is a trademark of its owner; this project is not affiliated with or endorsed by ClickUp.
