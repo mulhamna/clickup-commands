@@ -109,8 +109,13 @@ pub fn parse_when_at(input: &str, tz: Option<&str>, now: DateTime<Utc>) -> Resul
     }
 
     if let Some(sign) = s.chars().next().filter(|c| *c == '+' || *c == '-') {
-        let unit = s.chars().last().ok_or_else(invalid)?;
-        let n: i64 = s[1..s.len() - 1].parse().map_err(|_| invalid())?;
+        // `sign` is ASCII, so slicing after it is safe; the unit may be any
+        // char, so strip it by its UTF-8 length rather than by one byte.
+        let body = &s[1..];
+        let unit = body.chars().last().ok_or_else(invalid)?;
+        let n: i64 = body[..body.len() - unit.len_utf8()]
+            .parse()
+            .map_err(|_| invalid())?;
         let n = if sign == '-' { -n } else { n };
         let delta = match unit {
             'm' => Duration::minutes(n),
@@ -303,6 +308,13 @@ mod tests {
             jkt(2026, 10, 18, 23, 59) + 59_999
         );
         assert!(parse_when_at("someday", TZ, now()).is_err());
+        // Regressions: lone sign, and a multibyte char where the unit goes
+        // (found by fuzzing: bytes 2d 00 f6 d9 df).
+        for bad in ["+", "-", "+d", "-é", "+3é", "-\u{0}\u{fffd}\u{fffd}"] {
+            assert!(parse_when_at(bad, TZ, now()).is_err(), "{bad:?}");
+        }
+        let fuzzed = String::from_utf8_lossy(&[0x2d, 0x00, 0xf6, 0xd9, 0xdf]).to_string();
+        assert!(parse_when_at(&fuzzed, TZ, now()).is_err());
         assert!(parse_when_at("+3x", TZ, now()).is_err());
     }
 
