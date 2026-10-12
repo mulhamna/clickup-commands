@@ -140,7 +140,7 @@ impl TaskFilter {
 
 /// Operators accepted in `--field 'Name<op>value'`, longest first so `<=`
 /// wins over `<`.
-const SYMBOL_OPS: [&str; 6] = ["!=", "<=", ">=", "=", "<", ">"];
+const SYMBOL_OPS: [&str; 8] = ["!==", "==", "!=", "<=", ">=", "=", "<", ">"];
 const WORD_OPS: [&str; 7] = [
     "IS NOT NULL",
     "IS NULL",
@@ -286,6 +286,8 @@ mod tests {
             ("Points".into(), ">=".into(), Some("3".into()))
         );
         assert_eq!(p("A!=b"), ("A".into(), "!=".into(), Some("b".into())));
+        assert_eq!(p("A==b"), ("A".into(), "==".into(), Some("b".into())));
+        assert_eq!(p("A!==b"), ("A".into(), "!==".into(), Some("b".into())));
         assert_eq!(p("Owner IS NULL"), ("Owner".into(), "IS NULL".into(), None));
         assert_eq!(
             p("Owner is not null"),
