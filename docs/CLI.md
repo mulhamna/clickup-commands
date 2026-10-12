@@ -205,4 +205,4 @@ clickupc mcp serve [--transport stdio|streamable-http] [--host] [--port] [--path
 clickupc mcp doctor                                 # check binary on PATH, token, workspace, a test call
 clickupc mcp install --client claude-code|claude-desktop|cursor|gemini-cli|codex|vscode|… [--server-profile <name>] [--dry-run] [--force]
 ```
-Registration goes through `kurir` (same targets as `jirac mcp install`); the written entry is `command: "clickupc", args: ["mcp", "serve"]` (no separate MCP binary). `--server-profile` pins `CLICKUP_PROFILE` in the entry; the token is never written.
+Registration goes through `kurir`; the written entry is `command: "clickupc", args: ["mcp", "serve"]` (no separate MCP binary). `--server-profile` pins `CLICKUP_PROFILE` in the entry; the token is never written.

@@ -1,4 +1,4 @@
-//! Long help texts with the clickupc banner, mirroring jirac's help_text.rs.
+//! Long help texts with the clickupc banner.
 
 macro_rules! banner {
     () => {

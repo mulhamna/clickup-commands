@@ -1,6 +1,6 @@
 # clickupc
 
-**Unofficial** ClickUp CLI and MCP server in one Rust binary. Sibling of [jira-commands](https://github.com/mulhamna/jira-commands).
+**Unofficial** ClickUp CLI and MCP server in one Rust binary.
 
 > Status: pre-1.0. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -96,7 +96,7 @@ Your token stays in `~/.config/clickupc/config.toml` (or `CLICKUP_TOKEN`); it is
 ## Docs
 
 - [Roadmap](docs/ROADMAP.md) · [Architecture](docs/ARCHITECTURE.md) · [CLI spec](docs/CLI.md) · [MCP tools](docs/MCP.md)
-- [ClickUp API notes](docs/CLICKUP-API.md) · [Porting map from jira-commands](docs/JIRA-MAPPING.md)
+- [ClickUp API notes](docs/CLICKUP-API.md)
 
 ## License
 

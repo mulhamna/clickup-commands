@@ -1,6 +1,6 @@
 # MCP server tool spec
 
-Run: `clickupc mcp serve [--transport stdio|streamable-http] [--host 127.0.0.1] [--port 8787] [--path /mcp]` — same flags as `jirac-mcp serve`. There is no separate MCP binary; the code lives in the `clickupc-mcp` library crate and ships inside `clickupc`.
+Run: `clickupc mcp serve [--transport stdio|streamable-http] [--host 127.0.0.1] [--port 8787] [--path /mcp]`. There is no separate MCP binary; the code lives in the `clickupc-mcp` library crate and ships inside `clickupc`.
 
 Auth: reads the same config/profile as `clickupc` (`~/.config/clickupc/config.toml`, `CLICKUP_TOKEN`, `CLICKUP_PROFILE`, …). No OAuth.
 
@@ -10,7 +10,7 @@ Auth: reads the same config/profile as `clickupc` (`~/.config/clickupc/config.to
 2. **Compact by default.** Task outputs return a summary (`id`, `custom_id`, `name`, `status`, `priority`, `assignees[] {id, username}`, `due`, `list {id, name}`, `url`). Pass `detail: "full"` for description, custom fields, checklists, relations.
 3. **Human dates.** Date params accept ISO dates and the relative forms from `time.rs` (`tomorrow`, `+3d`, `eow`); outputs return both ISO-8601 (in the configured timezone) and unix ms.
 4. **Destructive = `confirm: true`.** Any delete/remove/clear tool fails with `unsafe_operation` unless `confirm` is true. Bulk tools also require `confirm: true` when they would touch more than 1 task; with `dry_run: true` they return the plan instead.
-5. **Stable errors.** `AppError` codes: `validation_error`, `unsafe_operation`, `auth_missing`, `config_error`, `resolve_error` (`data.suggestions`), `clickup_api_error` (`data.status`, `data.ecode`, `data.trace_id`), `rate_limited` (`data.reset_at`). 4xx → `INVALID_PARAMS`, 5xx → `INTERNAL_ERROR` (same mapping as jira-mcp).
+5. **Stable errors.** `AppError` codes: `validation_error`, `unsafe_operation`, `auth_missing`, `config_error`, `resolve_error` (`data.suggestions`), `clickup_api_error` (`data.status`, `data.ecode`, `data.trace_id`), `rate_limited` (`data.reset_at`). 4xx → `INVALID_PARAMS`, 5xx → `INTERNAL_ERROR`.
 6. **Descriptions are prompts.** Each tool's description tells the model *when* to use it and the gotchas (e.g. "use clickup_field_set to change custom fields; clickup_task_update cannot").
 7. Rate limiting is invisible to the model: the core retries 429s. Only after retries are exhausted does a tool return `rate_limited`.
 

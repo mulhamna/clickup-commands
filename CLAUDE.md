@@ -2,7 +2,7 @@
 
 Guide for Claude (and contributors) when working in this repo.
 
-This project is a sibling of [`mulhamna/jira-commands`](https://github.com/mulhamna/jira-commands). Same author, same architecture, same conventions — ported to ClickUp. When in doubt about *how* to do something (error types, config loading, retry loop, rmcp wiring, `mcp install`), look at how `jira-commands` does it and mirror it. When in doubt about *what* ClickUp does, read `docs/CLICKUP-API.md`, then the official reference.
+When in doubt about *how* something works here (error types, config loading, retry loop, rmcp wiring, `mcp install`), follow the existing code in `crates/`. When in doubt about *what* ClickUp does, read `docs/CLICKUP-API.md`, then the official reference.
 
 ---
 
@@ -44,7 +44,7 @@ Why it exists: ClickUp's official MCP server (`mcp.clickup.com`) is OAuth-only, 
 
 ### Names (fixed — don't rename)
 
-Brand is **`clickupc`** (mirrors `jirac`). Every published name uses it, so nothing collides with existing `clickup*` crates or looks like an official ClickUp package.
+Brand is **`clickupc`**. Every published name uses it, so nothing collides with existing `clickup*` crates or looks like an official ClickUp package.
 
 | Thing | Name |
 | --- | --- |
@@ -104,12 +104,12 @@ No TUI in v1 (see ROADMAP "Later").
 ### Crate responsibilities
 
 - **`clickupc-core`** — everything that talks to ClickUp. No `println!`, no clap, no rmcp. Returns typed models and `ClickUpError`.
-- **`clickupc/`** — clap parsing, interactive prompts (`inquire`) for missing args and delete confirmation, table/JSON output. Binary: `clickupc`. Includes `clickupc mcp doctor` and `clickupc mcp install --client <target>` (port from jira-commands).
+- **`clickupc/`** — clap parsing, interactive prompts (`inquire`) for missing args and delete confirmation, table/JSON output. Binary: `clickupc`. Includes `clickupc mcp doctor` and `clickupc mcp install --client <target>` (registration via `kurir`).
 - **`clickupc-mcp/`** — rmcp server exposing `clickupc-core` as tools, as a **library**. Every tool name is prefixed `clickup_`. It has no `main.rs`; the `clickupc` binary calls it from `clickupc mcp serve`.
 
-### Single binary, single release (differs from jira-commands)
+### Single binary, single release
 
-jira-commands ships `jirac` and `jirac-mcp` as two binaries with two release lanes and two npm packages. This repo deliberately does **not**:
+There is exactly one binary, one release lane and one npm package:
 
 - One binary: `clickupc`. MCP lives under `clickupc mcp serve|doctor|install`.
 - One version for the whole workspace (`/VERSION`), one tag lane `vX.Y.Z`, one GitHub Release with one archive per platform, one npm package.
@@ -127,7 +127,7 @@ Full notes: `docs/CLICKUP-API.md`. The rules below are the ones that bite.
 - **Auth header**: `Authorization: pk_xxx` — raw token, **no `Bearer` prefix** for personal tokens. (OAuth tokens use `Bearer`; OAuth is out of scope for v1.)
 - **Base URL**: `https://api.clickup.com/api`, then `/v2/...` or `/v3/...`. Overridable via `CLICKUP_BASE_URL` (tests). Keep v2 and v3 calls behind client methods; never build URLs in the CLI or MCP crates.
 - **Team = Workspace**: v2 calls it `team` / `team_id`; v3 calls it `workspace_id`. Same number. Use `workspace_id` everywhere in our code and only translate at the HTTP layer.
-- **Rate limit**: per token per minute (100 on Free/Unlimited/Business, 1,000 Business Plus, 10,000 Enterprise). On 429, read `X-RateLimit-Reset` (unix seconds), sleep until then (+ small jitter), retry. Max 3 retries, then `ClickUpError::RateLimit`. ClickUp documents only the `X-RateLimit-*` headers, not `Retry-After` — don't copy jira-commands' header logic blindly (honor `Retry-After` too if it ever shows up).
+- **Rate limit**: per token per minute (100 on Free/Unlimited/Business, 1,000 Business Plus, 10,000 Enterprise). On 429, read `X-RateLimit-Reset` (unix seconds), sleep until then (+ small jitter), retry. Max 3 retries, then `ClickUpError::RateLimit`. ClickUp documents only the `X-RateLimit-*` headers, not `Retry-After` (honor `Retry-After` too if it ever shows up).
 - **Timestamps**: always Unix **milliseconds** (dates, filters, durations, `time_estimate`). Responses often return them as **strings** — deserialize with a string-or-number helper.
 - **Pagination**:
   - Tasks: `page` starting at 0, max 100 per page. Stop when `last_page == true` *or* the page has fewer than 100 tasks. Hard cap 500 pages.
@@ -197,7 +197,5 @@ release.yml (tag push):
 | `docs/ROADMAP.md` | Phases, tasks, acceptance criteria — **start here** |
 | `docs/ARCHITECTURE.md` | Module design, key types, data flow |
 | `docs/CLICKUP-API.md` | Endpoints, payloads, gotchas |
-| `docs/JIRA-MAPPING.md` | What maps 1:1 from jira-commands, what changes, what's dropped |
 | `docs/CLI.md` | `clickupc` command spec |
 | `docs/MCP.md` | MCP server (`clickupc mcp serve`) tool spec |
-| `docs/ONBOARDING.md` | Prompts the repo owner uses to drive each phase |

@@ -19,7 +19,7 @@
                     https://api.clickup.com/api
 ```
 
-Rule of thumb: **the CLI and MCP crates never see a URL or a raw HTTP status.** They call `clickupc-core` with typed inputs and get typed models or `ClickUpError` back. This is the same split jira-commands uses (`jira-core` / `jira` / `jira-mcp`).
+Rule of thumb: **the CLI and MCP crates never see a URL or a raw HTTP status.** They call `clickupc-core` with typed inputs and get typed models or `ClickUpError` back.
 
 ---
 
@@ -27,7 +27,7 @@ Rule of thumb: **the CLI and MCP crates never see a URL or a raw HTTP status.** 
 
 ### Config — `config.rs`
 
-Ported from `jira-core/src/config.rs` (figment, profiles, env override, chmod-600 warning).
+Profiles, env overrides, chmod-600 on save and a warning when the file is readable by others.
 
 File: `~/.config/clickupc/config.toml` (via `dirs::config_dir()`).
 
@@ -71,7 +71,7 @@ pub enum ClickUpError {
 pub type Result<T> = std::result::Result<T, ClickUpError>;
 ```
 
-`Resolve` is new compared with jira-core: it's what you get for a typo'd list/status/member/field name, with "did you mean" suggestions (use `strsim` Jaro-Winkler, top 3 above 0.8).
+`Resolve` is what you get for a typo'd list/status/member/field name, with "did you mean" suggestions (use `strsim` Jaro-Winkler, top 3 above 0.8).
 
 ### HTTP client — `client/mod.rs`
 
@@ -99,7 +99,7 @@ impl ClickUpClient {
 - Error bodies parsed for v2 (`err`/`ECODE`) and v3 (`message`/`trace_id`).
 - `tracing::debug!` logs method + path + status + remaining budget. Never the token.
 
-Resource methods live in `client/{hierarchy,task,comment,field,time,relation,member,doc}.rs` as `impl ClickUpClient` blocks — keeps any one file far smaller than jira-core's 4k-line `client.rs`.
+Resource methods live in `client/{hierarchy,task,comment,field,time,relation,member,doc}.rs` as `impl ClickUpClient` blocks so no single file grows into a monolith.
 
 ### Rate limiter — `rate_limit.rs`
 
@@ -173,7 +173,7 @@ pub struct TaskFilter {
 
 ### Time input — `time.rs`
 
-`parse_when(input, tz) -> i64 (unix ms)` accepts `2026-10-20`, `2026-10-20 14:00`, `today`, `tomorrow`, `yesterday`, `mon`..`sun` (next occurrence), `+3d`, `-2w`, `eod`, `eow`. `parse_duration("1h30m") -> ms`. Display helpers render ms in the configured timezone. Port the useful bits from `jira/src/datetime.rs`.
+`parse_when(input, tz) -> i64 (unix ms)` accepts `2026-10-20`, `2026-10-20 14:00`, `today`, `tomorrow`, `yesterday`, `mon`..`sun` (next occurrence), `+3d`, `-2w`, `eod`, `eow`. `parse_duration("1h30m") -> ms`. Display helpers render ms in the configured timezone.
 
 ### Models — `model/`
 
@@ -185,7 +185,7 @@ Serde structs mirroring API responses, tolerant by default (`#[serde(default)]`,
 
 - `clap` derive, one module per noun under `cli/`.
 - Global flags: `--profile`, `--json`, `--verbose`, `--refresh` (bust resolver cache), `--yes` (skip confirmations).
-- Output: `output.rs` renders tables with `comfy-table` (or the same approach jira-commands uses) and `--json` prints the raw model. JSON is stable output for scripting; table layout can change.
+- Output: `output.rs` renders tables with `comfy-table` and `--json` prints the raw model. JSON is stable output for scripting; table layout can change.
 - Interactive: when a required arg is missing and stdin is a TTY, prompt with `inquire` (list picker, status picker, assignee picker). Non-TTY → error with the flag name.
 - Destructive commands confirm unless `--yes`.
 - Exit codes: 0 ok, 1 generic error, 2 usage, 3 auth, 4 not found, 5 rate limited.
@@ -194,15 +194,15 @@ Full spec: `docs/CLI.md`.
 
 ## clickupc-mcp
 
-Ported from `jira-mcp`, but as a **library crate** (no `main.rs`):
+A **library crate** (no `main.rs`):
 
-- `lib.rs`: `pub async fn run_stdio(cfg) ` and `pub async fn run_streamable_http(cfg, host, port, path)`. Invoked by `clickupc mcp serve --transport stdio|streamable-http --host --port --path` (same flags as `jirac-mcp serve`).
+- `lib.rs`: `pub async fn run_stdio(cfg) ` and `pub async fn run_streamable_http(cfg, host, port, path)`. Invoked by `clickupc mcp serve --transport stdio|streamable-http --host --port --path`.
 - In stdio mode, **nothing may write to stdout except the MCP transport**: tracing goes to stderr, and the CLI's version-check notice, progress bars and color output must be disabled on this code path.
 - `server.rs`: rmcp `#[tool]` methods, names prefixed `clickup_`.
 - `models.rs`: request/response structs with `schemars` doc comments — these become the tool schemas the LLM sees, so write descriptions for the model, not for humans.
 - `error.rs`: `AppError` with stable string codes: `validation_error`, `unsafe_operation`, `auth_missing`, `config_error`, `resolve_error` (carry suggestions in `data`), `clickup_api_error` (carry `status`, `ecode`, `trace_id` in `data`), `rate_limited` (carry `reset_at`).
 - `app/`: one module per resource, each a thin adapter: validate input → resolve names → call core → shape output.
-- Destructive tools require `confirm: true` (`require_confirm` helper, same as jira-mcp `app/shared.rs`).
+- Destructive tools require `confirm: true` (`require_confirm` helper in `app.rs`).
 - Outputs are compact by default (id, custom_id, name, status, assignees, due, url) with `detail: "full"` to get everything — keeps LLM context small.
 
 Full spec: `docs/MCP.md`.
@@ -212,5 +212,5 @@ Full spec: `docs/MCP.md`.
 - Unit tests next to code (`task_ref`, `filter` query building, `time` parsing, resolver fuzzy matching).
 - HTTP tests with `wiremock`: point `CLICKUP_BASE_URL` at the mock, assert method/path/query/headers/body. Required coverage per client method: happy path, 404 → `NotFound`, 429 → retry then success, 429 ×4 → `RateLimit`.
 - Fixtures: store sample responses under `crates/clickupc-core/tests/fixtures/*.json`, trimmed from the official reference examples.
-- MCP: in-process tests calling tool handlers with a mocked core (mirror `jira-mcp/src/app/tests.rs` + `tests/mcp_error_mapping.rs`).
+- MCP: in-process tests calling tool handlers with a mocked core.
 - Optional live smoke test behind `CLICKUP_LIVE_TEST=1` against a throwaway workspace, never in CI.

@@ -15,9 +15,9 @@ Commit per task with Conventional Commits (`feat(core): …`, `feat(cli): …`, 
 ## Phase 0 — Scaffold
 
 - [x] Cargo workspace with `crates/clickupc-core` (lib), `crates/clickupc-mcp` (lib, no binary), `crates/clickupc` (the only binary) (names per `CLAUDE.md`). Edition 2021, `license = "MIT"`, version `0.1.0` in `[workspace.package]`, shared deps in `[workspace.dependencies]`.
-- [x] Dependencies (match jira-commands versions where they overlap): `reqwest` (rustls, json, multipart), `tokio`, `serde`, `serde_json`, `figment`, `toml`, `dirs`, `thiserror`, `anyhow`, `tracing`, `chrono`, `chrono-tz`, `url`, `strsim`, `mime_guess`; CLI: `clap`, `inquire`, `indicatif`, `open`, `comfy-table`; MCP: `rmcp` (same features as jira-mcp), `schemars`, `axum`, `tracing-subscriber`; dev: `wiremock`, `tempfile`, `serial_test`.
+- [x] Dependencies: `reqwest` (rustls, json, multipart), `tokio`, `serde`, `serde_json`, `figment`, `toml`, `dirs`, `thiserror`, `anyhow`, `tracing`, `chrono`, `chrono-tz`, `url`, `strsim`, `mime_guess`; CLI: `clap`, `inquire`, `indicatif`, `open`, `comfy-table`; MCP: `rmcp`, `schemars`, `axum`, `tracing-subscriber`; dev: `wiremock`, `tempfile`, `serial_test`.
 - [x] `LICENSE` (MIT), `.gitignore`, `README.md`, `CLAUDE.md`, `AGENTS.md`.
-- [x] CI: copy `ci.yml` (fmt/clippy/test/build matrix), `security.yml`, `deny.toml`, `dependabot.yml` from jira-commands; rename crates.
+- [x] CI: copy `ci.yml` (fmt/clippy/test/build matrix), `security.yml`, `deny.toml`, `dependabot.yml`.
 - [x] `clickupc --version` runs; `clickupc mcp serve` starts and answers `initialize` over stdio (empty tool list is fine).
 
 **Accept:** workspace builds on CI matrix; exactly one binary is produced.
@@ -99,21 +99,21 @@ Core + CLI + MCP for:
 ## Phase 5 — Docs API + MCP install
 
 - [x] v3 Docs: search, get, pages listing, get pages, create doc, create page, edit page (read the "Docs API limitation" guide first).
-- [x] `clickupc mcp doctor` and `clickupc mcp install --client …` ported from jira-commands (all client targets).
+- [x] `clickupc mcp doctor` and `clickupc mcp install --client …` via kurir (all client targets).
 - [ ] MCP tool descriptions reviewed end-to-end by running the server in Claude Code against a real workspace (owner).
 
 **Accept:** `clickupc mcp install --client claude-code` produces a working server entry without embedding the token.
 
 ## Phase 6 — Release & distribution
 
-Adapt from jira-commands (single lane, single binary), renaming everything per `CLAUDE.md` "Names":
+Single lane, single binary, names per `CLAUDE.md` "Names":
 - [x] release-please with **one** lane: tag `vX.Y.Z`, `/VERSION` drives all three crates (generic updater on each `Cargo.toml`). No `separate-pull-requests`, no MCP manifest.
 - [x] Release workflows building binaries (linux/macos/windows, x86_64 + aarch64), crates.io publish order `clickupc-core` → `clickupc-mcp` → `clickupc`, via OIDC trusted publishing.
 - [x] One npm wrapper `@mulham28/clickupc` (bin: `clickupc`); one brew formula, one scoop/winget manifest — each installs the single binary, which covers both CLI and MCP.
 - [x] install.sh / install.ps1 (checksum-verified).
 - [ ] Docker (deferred).
 - [ ] Claude Code plugin (`plugin/`) with ClickUp skills: list-tasks, view-task, create-task, update-task, set-status, bulk-update, comment, time, fields, standup, api.
-- [x] Add a release-flow section to CLAUDE.md, adapted from jira-commands but with one lane (drop the dual-lane and manifest-race parts).
+- [x] Add a release-flow section to CLAUDE.md.
 
 **Accept:** a dry-run release on a fork publishes nothing but builds all artifacts.
 
@@ -121,8 +121,8 @@ Adapt from jira-commands (single lane, single binary), renaming everything per `
 
 ## Later (not v1)
 
-- TUI (port `jira/src/tui`, columns = statuses of a list).
+- TUI (columns = statuses of a list).
 - OAuth login (needed only if distributing as a hosted app).
-- Webhooks-based notifications (replacement for jirac's notifications scan).
+- Webhooks-based notifications.
 - Rich comment formatting + @mentions.
 - Goals, Views, Chat.
