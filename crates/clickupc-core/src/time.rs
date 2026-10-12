@@ -118,13 +118,17 @@ pub fn parse_when_at(input: &str, tz: Option<&str>, now: DateTime<Utc>) -> Resul
             .map_err(|_| invalid())?;
         let n = if sign == '-' { -n } else { n };
         let delta = match unit {
-            'm' => Duration::minutes(n),
-            'h' => Duration::hours(n),
-            'd' => Duration::days(n),
-            'w' => Duration::weeks(n),
+            'm' => Duration::try_minutes(n),
+            'h' => Duration::try_hours(n),
+            'd' => Duration::try_days(n),
+            'w' => Duration::try_weeks(n),
             _ => return Err(invalid()),
-        };
-        return Ok((now + delta).timestamp_millis());
+        }
+        .ok_or_else(invalid)?;
+        return now
+            .checked_add_signed(delta)
+            .map(|t| t.timestamp_millis())
+            .ok_or_else(invalid);
     }
 
     if s.len() >= 12 && s.chars().all(|c| c.is_ascii_digit()) {
@@ -188,13 +192,17 @@ pub fn parse_duration(input: &str) -> Result<i64> {
         }
         let n: i64 = num.parse().map_err(|_| invalid())?;
         num.clear();
-        total += n * match c {
+        let unit_ms: i64 = match c {
             'd' => 86_400_000,
             'h' => 3_600_000,
             'm' => 60_000,
             's' => 1_000,
             _ => return Err(invalid()),
         };
+        total = n
+            .checked_mul(unit_ms)
+            .and_then(|ms| total.checked_add(ms))
+            .ok_or_else(invalid)?;
     }
     if !num.is_empty() || total <= 0 {
         return Err(invalid());
@@ -315,6 +323,14 @@ mod tests {
         }
         let fuzzed = String::from_utf8_lossy(&[0x2d, 0x00, 0xf6, 0xd9, 0xdf]).to_string();
         assert!(parse_when_at(&fuzzed, TZ, now()).is_err());
+        // Overflow regressions (fuzz input "-6662020166202017h").
+        for big in [
+            "-6662020166202017h",
+            "+9223372036854775807w",
+            "-99999999999999d",
+        ] {
+            assert!(parse_when_at(big, TZ, now()).is_err(), "{big:?}");
+        }
         assert!(parse_when_at("+3x", TZ, now()).is_err());
     }
 
@@ -326,6 +342,8 @@ mod tests {
         assert_eq!(parse_duration("1d").unwrap(), 86_400_000);
         assert!(parse_duration("90").is_err());
         assert!(parse_duration("abc").is_err());
+        assert!(parse_duration("9223372036854775807d").is_err());
+        assert!(parse_duration("3000000000000h3000000000000h").is_err());
         assert_eq!(format_duration(5_400_000), "1h 30m");
         assert_eq!(format_duration(7_200_000), "2h");
         assert_eq!(format_duration(30_000), "30s");

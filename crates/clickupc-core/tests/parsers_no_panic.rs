@@ -27,7 +27,7 @@ const ALPHABET: &[u8] =
 fn parsers_never_panic() {
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
     for _ in 0..50_000 {
-        let len = (rng.next() % 12) as usize;
+        let len = (rng.next() % 24) as usize;
         let bytes: Vec<u8> = (0..len)
             .map(|_| ALPHABET[(rng.next() % ALPHABET.len() as u64) as usize])
             .collect();
