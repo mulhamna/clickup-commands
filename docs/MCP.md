@@ -135,7 +135,7 @@ Phase tags refer to `docs/ROADMAP.md`. "Official" = equivalent exists in ClickUp
 ```json
 {
   "mcpServers": {
-    "clickup": {
+    "clickupc": {
       "command": "clickupc",
       "args": ["mcp", "serve"],
       "env": { "CLICKUP_PROFILE": "work" }
@@ -143,5 +143,7 @@ Phase tags refer to `docs/ROADMAP.md`. "Official" = equivalent exists in ClickUp
   }
 }
 ```
+
+The default entry name is `clickupc` (override with `--name`) so it can coexist with ClickUp's official server, which clients typically register as `clickup`. Claude Code namespaces tools per server (`mcp__clickupc__clickup_task_get`), so the shared `clickup_` tool prefix does not collide.
 
 Never write the token into client config files; the server reads it from the clickupc config (or the user's env).

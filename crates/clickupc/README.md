@@ -32,7 +32,7 @@ clickupc mcp install --client claude-code   # or cursor, codex, gemini-cli, vsco
 ```
 
 ```json
-{ "mcpServers": { "clickup": { "command": "clickupc", "args": ["mcp", "serve"] } } }
+{ "mcpServers": { "clickupc": { "command": "clickupc", "args": ["mcp", "serve"] } } }
 ```
 
 55 `clickup_*` tools across tasks, bulk, comments, custom fields, relations, time, reports and docs. Inputs accept names and human dates; destructive tools require `confirm: true`; the token is read from the clickupc config and never written into client configs. Stdio by default, Streamable HTTP with `--transport streamable-http`.
