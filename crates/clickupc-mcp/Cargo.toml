@@ -24,7 +24,7 @@ tokio-util = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-rmcp = { workspace = true, features = ["client"] }
+rmcp = { workspace = true, features = ["client", "transport-streamable-http-client-reqwest"] }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 wiremock = { workspace = true }
