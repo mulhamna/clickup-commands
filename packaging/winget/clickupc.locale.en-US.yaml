@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+PackageIdentifier: mulhamna.clickupc
+PackageVersion: 0.0.0
+PackageLocale: en-US
+Publisher: mulhamna
+PublisherUrl: https://github.com/mulhamna
+PublisherSupportUrl: https://github.com/mulhamna/clickup-commands/issues
+Author: mulhamna
+PackageName: clickupc
+PackageUrl: https://github.com/mulhamna/clickup-commands
+License: MIT
+LicenseUrl: https://github.com/mulhamna/clickup-commands/blob/main/LICENSE
+ShortDescription: Unofficial ClickUp CLI and MCP server in one binary.
+Description: clickupc is a Rust CLI for ClickUp tasks, comments, custom fields, time tracking and docs, and an MCP server (clickupc mcp serve) for AI agents, using a personal API token.
+Moniker: clickupc
+Tags:
+  - clickup
+  - cli
+  - mcp
+  - productivity
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0

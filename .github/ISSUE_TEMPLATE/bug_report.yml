@@ -1,0 +1,130 @@
+name: Bug report
+description: Report a defect in the clickupc CLI, MCP server, or clickupc-core
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Before submitting:
+        - Search [existing issues](https://github.com/mulhamna/clickup-commands/issues?q=is%3Aissue) for duplicates.
+        - Run `clickupc --version` and check you're on the latest release.
+        - **Redact** your API token (`pk_…`), emails, workspace names and task contents from anything you paste.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `clickupc --version`.
+      placeholder: "clickupc 0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - clickupc (CLI)
+        - clickupc mcp serve (MCP server)
+        - clickupc mcp install / doctor
+        - clickupc-core (library)
+        - Packaging (npm / Homebrew / Scoop / winget)
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Install method
+      options:
+        - npm
+        - cargo install
+        - Homebrew
+        - Scoop
+        - winget
+        - GitHub release binary
+        - Built from source
+    validations:
+      required: true
+
+  - type: dropdown
+    id: plan
+    attributes:
+      label: ClickUp plan
+      description: Some APIs and rate limits depend on the workspace plan.
+      options:
+        - Free Forever
+        - Unlimited
+        - Business
+        - Business Plus
+        - Enterprise
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15.2 (arm64)"
+    validations:
+      required: true
+
+  - type: input
+    id: mcp-client
+    attributes:
+      label: MCP client (if relevant)
+      placeholder: "Claude Code 2.x, Cursor, Codex, …"
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands / tool calls with flags and inputs.
+      placeholder: |
+        1. `clickupc task list --list sprint --status "in progress"`
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Full error message, including the ECODE if ClickUp returned one.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug output
+      description: Re-run with `--verbose` (or `RUST_LOG=debug`). Tokens are redacted automatically, but double-check before pasting.
+      render: shell
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched existing issues and found no duplicate.
+          required: true
+        - label: I removed tokens, emails and private workspace data from this report.
+          required: true
