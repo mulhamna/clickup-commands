@@ -45,11 +45,14 @@ default_task_limit = 200    # optional cap for list-like commands
 [profiles.work.aliases]     # optional short names → ids
 sprint = "901234567890"
 inbox  = "901234567891"
+
+[profiles.work.tokens]      # optional workspace id → token, written by `auth login`
+"9012345678" = "pk_..."     # used when that workspace is selected; `token` is the fallback
 ```
 
 Env overrides (highest priority): `CLICKUP_TOKEN`, `CLICKUP_WORKSPACE_ID`, `CLICKUP_PROFILE`, `CLICKUP_DEFAULT_LIST`, `CLICKUP_TIMEOUT_SECS`, `CLICKUP_TASK_LIMIT`, `CLICKUP_BASE_URL` (tests / proxies), `CLICKUP_CACHE_DIR`.
 
-Priority: env > selected profile > defaults. `CLICKUP_PROFILE` selects the profile.
+Priority: env > selected profile > defaults. `CLICKUP_PROFILE` selects the profile. Token: `CLICKUP_TOKEN` > `tokens[workspace_id]` > `token`.
 
 ### Errors — `error.rs`
 

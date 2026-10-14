@@ -26,7 +26,7 @@ Phase tags refer to `docs/ROADMAP.md`. "Official" = equivalent exists in ClickUp
 
 | Tool | Input | Notes | Official |
 | --- | --- | --- | --- |
-| `clickup_profile_list` | — | configured profiles (name, workspace, masked token, active) | — |
+| `clickup_profile_list` | — | configured profiles (name, workspace, masked token, masked per-workspace tokens, active) | — |
 | `clickup_auth_status` | — | profile, workspace, user, token present (masked), config path | — |
 | `clickup_whoami` | — | user id, username, email, timezone, workspace id/name, plan | — |
 | `clickup_workspace_list` | — | authorized workspaces | — |

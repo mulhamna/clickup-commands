@@ -18,8 +18,9 @@ clickupc auth login [--token pk_…|-] [--profile work] [--workspace <w>]
     # token input is masked; workspace picker; new profile name suggested from the workspace;
     # asks whether to make it active, then offers to run `mcp install`.
     # Non-TTY: --token, --token - (stdin) or CLICKUP_TOKEN; updates --profile or the active profile.
+    # Updating a profile adds the token for the chosen workspace (others are kept) and makes it the default.
 clickupc auth status                                  # profile, workspace, user, token present (masked), config path
-clickupc auth logout [--profile work]                 # remove stored token
+clickupc auth logout [--profile work]                 # remove stored tokens (all workspaces)
 clickupc auth profile list | use [<name>] | remove <name>   # `use` without a name shows a picker
 clickupc whoami                                       # user id, username, email, timezone, workspace + plan
 ```
