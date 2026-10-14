@@ -8,7 +8,7 @@ pub mod task;
 use std::io::Read;
 
 use anyhow::{Context, Result};
-use clickupc_core::{config::ClickUpConfig, ClickUpClient, Resolver};
+use clickupc_core::{client::select_workspace, config::ClickUpConfig, ClickUpClient, Resolver};
 
 /// Global flags shared by every command.
 #[derive(Debug, Clone)]
@@ -45,16 +45,10 @@ impl Ctx {
 
     pub async fn session(&self) -> Result<Session> {
         let mut cfg = self.config()?;
-        let mut client = ClickUpClient::new(&cfg)?;
         if let Some(w) = &self.workspace {
-            let id = if !w.is_empty() && w.chars().all(|c| c.is_ascii_digit()) {
-                w.clone()
-            } else {
-                client.find_workspace(w).await?.id
-            };
-            cfg.workspace_id = Some(id.clone());
-            client = client.with_workspace(id);
+            select_workspace(&mut cfg, w).await?;
         }
+        let client = ClickUpClient::new(&cfg)?;
         Ok(Session {
             cfg,
             client,
