@@ -12,6 +12,7 @@ mod time;
 pub use comment::COMMENT_PAGE_SIZE;
 pub use doc::DocParent;
 pub use field::{convert_field_value, relation_value, FieldValue};
+pub use hierarchy::{select_workspace, workspaces_for};
 pub use relation::Dependency;
 pub use task::{CreateTask, MoveTask, UpdateTask, MAX_PAGES, PAGE_SIZE};
 pub use time::{NewTimeEntry, TimeQuery};
