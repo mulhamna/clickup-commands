@@ -35,6 +35,23 @@ pub struct Profile {
     pub default_task_limit: Option<usize>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub aliases: BTreeMap<String, String>,
+    /// Workspace id → token, for accounts whose tokens each reach a single
+    /// workspace. `token` is the fallback for workspaces not listed here.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub tokens: BTreeMap<String, String>,
+}
+
+impl Profile {
+    /// Store `token` for `workspace_id` and make it the default. A legacy
+    /// single token is kept under its own workspace so it keeps working.
+    pub fn add_token(&mut self, workspace_id: &str, token: String) {
+        if let (Some(old), Some(ws)) = (&self.token, &self.workspace_id) {
+            self.tokens.entry(ws.clone()).or_insert_with(|| old.clone());
+        }
+        self.tokens.insert(workspace_id.to_string(), token.clone());
+        self.token = Some(token);
+        self.workspace_id = Some(workspace_id.to_string());
+    }
 }
 
 fn env(key: &str) -> Option<String> {
@@ -156,6 +173,8 @@ pub struct ClickUpConfig {
     pub timeout_secs: u64,
     pub default_task_limit: Option<usize>,
     pub aliases: BTreeMap<String, String>,
+    /// Per-workspace tokens of the profile; empty when `CLICKUP_TOKEN` is set.
+    pub tokens: BTreeMap<String, String>,
     pub base_url: String,
     pub cache_dir: PathBuf,
     pub config_path: PathBuf,
@@ -185,10 +204,21 @@ impl ClickUpConfig {
                 .unwrap_or_else(std::env::temp_dir)
                 .join("clickupc"),
         };
+        let env_token = env("CLICKUP_TOKEN");
+        let tokens = if env_token.is_some() {
+            BTreeMap::new()
+        } else {
+            p.tokens
+        };
+        let workspace_id = env("CLICKUP_WORKSPACE_ID").or(p.workspace_id);
+        let token = env_token
+            .or_else(|| workspace_id.as_ref().and_then(|w| tokens.get(w).cloned()))
+            .or(p.token);
         Ok(Self {
             profile: name,
-            token: env("CLICKUP_TOKEN").or(p.token),
-            workspace_id: env("CLICKUP_WORKSPACE_ID").or(p.workspace_id),
+            token,
+            workspace_id,
+            tokens,
             default_list: env("CLICKUP_DEFAULT_LIST").or(p.default_list),
             timezone: env("CLICKUP_TIMEZONE").or(p.timezone),
             timeout_secs: env_parse("CLICKUP_TIMEOUT_SECS")?
@@ -213,6 +243,7 @@ impl ClickUpConfig {
             timeout_secs: DEFAULT_TIMEOUT_SECS,
             default_task_limit: None,
             aliases: BTreeMap::new(),
+            tokens: BTreeMap::new(),
             base_url: base_url.into(),
             cache_dir: std::env::temp_dir().join("clickupc"),
             config_path: PathBuf::new(),
@@ -234,6 +265,26 @@ impl ClickUpConfig {
                     .into(),
             )
         })
+    }
+
+    /// Switch to `workspace_id`, and to its own token when the profile has one.
+    pub fn set_workspace(&mut self, workspace_id: impl Into<String>) {
+        let id = workspace_id.into();
+        if let Some(t) = self.tokens.get(&id) {
+            self.token = Some(t.clone());
+        }
+        self.workspace_id = Some(id);
+    }
+
+    /// Every distinct token of the profile, the active one first.
+    pub fn all_tokens(&self) -> Vec<String> {
+        let mut out: Vec<String> = self.token.iter().cloned().collect();
+        for t in self.tokens.values() {
+            if !out.contains(t) {
+                out.push(t.clone());
+            }
+        }
+        out
     }
 
     /// `pk_12…AB` style preview that is safe to print.
@@ -357,6 +408,33 @@ mod tests {
         let cfg = ClickUpConfig::load().unwrap();
         assert!(matches!(cfg.token(), Err(ClickUpError::Auth(_))));
         assert!(matches!(cfg.workspace_id(), Err(ClickUpError::Config(_))));
+    }
+
+    #[test]
+    #[serial]
+    fn per_workspace_tokens() {
+        let _dir = isolated();
+        let mut file = ConfigFile::default();
+        let p = file.profile_mut("default");
+        p.token = Some("pk_one".into());
+        p.workspace_id = Some("1".into());
+        p.add_token("2", "pk_two".into());
+        assert_eq!(p.tokens.get("1").map(String::as_str), Some("pk_one"));
+        assert_eq!(p.token.as_deref(), Some("pk_two"));
+
+        let mut cfg = ClickUpConfig::from_file(&file, None).unwrap();
+        assert_eq!(cfg.token.as_deref(), Some("pk_two"));
+        assert_eq!(cfg.all_tokens(), vec!["pk_two", "pk_one"]);
+        cfg.set_workspace("1");
+        assert_eq!(cfg.token.as_deref(), Some("pk_one"));
+        cfg.set_workspace("3");
+        assert_eq!(cfg.token.as_deref(), Some("pk_one"));
+
+        std::env::set_var("CLICKUP_TOKEN", "pk_env");
+        let mut cfg = ClickUpConfig::from_file(&file, None).unwrap();
+        cfg.set_workspace("1");
+        assert_eq!(cfg.token.as_deref(), Some("pk_env"));
+        isolated();
     }
 
     #[test]
