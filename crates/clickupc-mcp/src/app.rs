@@ -9,7 +9,7 @@ use std::{
 };
 
 use clickupc_core::{
-    client::{DocParent, NewTimeEntry, TimeQuery},
+    client::{select_workspace, workspaces_for, DocParent, NewTimeEntry, TimeQuery},
     config::{mask_token, ClickUpConfig, ConfigFile},
     model::{Comment, Task, TimeEntry},
     ops::{self, BatchOp, BulkChanges, SearchInput, TaskInput, UpdateInput},
@@ -50,17 +50,11 @@ impl Ctx {
     /// per-call workspace override.
     pub async fn load(acc: &Account) -> AppResult<Self> {
         let mut cfg = load_config(acc.profile.as_deref())?;
-        let token = cfg.token()?.to_string();
-        let mut client = ClickUpClient::new(&cfg)?.with_limiter(limiter_for(&token));
         if let Some(w) = acc.workspace.as_deref().filter(|w| !w.trim().is_empty()) {
-            let id = if w.chars().all(|c| c.is_ascii_digit()) {
-                w.to_string()
-            } else {
-                client.find_workspace(w).await?.id
-            };
-            cfg.workspace_id = Some(id.clone());
-            client = client.with_workspace(id);
+            select_workspace(&mut cfg, w).await?;
         }
+        let token = cfg.token()?.to_string();
+        let client = ClickUpClient::new(&cfg)?.with_limiter(limiter_for(&token));
         Ok(Self { cfg, client })
     }
 
@@ -271,7 +265,7 @@ pub async fn whoami(a: Account) -> AppResult<Value> {
 pub async fn workspace_list(a: Account) -> AppResult<Value> {
     let ctx = Ctx::load(&a).await?;
     let current = ctx.cfg.workspace_id.clone();
-    let ws = ctx.client.workspaces().await?;
+    let ws = workspaces_for(&ctx.cfg).await?;
     Ok(json!(ws
         .iter()
         .map(|w| json!({
@@ -402,6 +396,9 @@ pub fn profile_list() -> AppResult<Value> {
             "name": name,
             "workspace_id": p.workspace_id,
             "token": p.token.as_deref().map(mask_token),
+            "workspace_tokens": p.tokens.iter()
+                .map(|(ws, t)| (ws.clone(), json!(mask_token(t))))
+                .collect::<serde_json::Map<_, _>>(),
             "active": *name == active,
         })).collect::<Vec<_>>(),
         "hint": "Pass `profile` (and optionally `workspace`) to any clickup_* tool to run it as that account.",
