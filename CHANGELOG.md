@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.0](https://github.com/mulhamna/clickup-commands/compare/v1.1.0...v1.2.0) (2026-10-14)
+
+
+### Features
+
+* **cli:** add tokens per workspace on login ([a8e51bc](https://github.com/mulhamna/clickup-commands/commit/a8e51bc1cb7994f16500fb250d6ce906121c5cd6))
+* **core:** resolve workspaces across all profile tokens ([8e28c82](https://github.com/mulhamna/clickup-commands/commit/8e28c821c5a7a6eff36a5da9725470944028cb3d))
+* **core:** store per-workspace tokens in profiles ([aa9c600](https://github.com/mulhamna/clickup-commands/commit/aa9c600196d65c1456a546919c1bd9c4beeb9a17))
+* **mcp:** switch token with the workspace override ([dced73f](https://github.com/mulhamna/clickup-commands/commit/dced73fe31e7b5b15b40ed718055f3e1a2d2b100))
+* support per-workspace tokens in one profile ([04f3739](https://github.com/mulhamna/clickup-commands/commit/04f37398fa74c4b7e477e65c6da402c254165bc4))
+
+
+### Bug Fixes
+
+* **deps:** bump rustls to 0.23.46 ([675a6ea](https://github.com/mulhamna/clickup-commands/commit/675a6ea43f17213e0b499bfaf6138fe2509b7787))
+
 ## [1.1.0](https://github.com/mulhamna/clickup-commands/compare/v1.0.2...v1.1.0) (2026-10-12)
 
 
