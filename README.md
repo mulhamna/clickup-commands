@@ -254,7 +254,7 @@ Global flags: `--profile`, `--workspace`, `--json`, `--refresh` (bypass caches),
 
 ### Multiple accounts and workspaces
 
-Each profile holds one personal token and a default workspace. A token already reaches every workspace its user belongs to, so use profiles for different ClickUp **users** and `--workspace` for different **workspaces**.
+Each profile is one ClickUp **user** with a default workspace; use `--workspace` to switch workspaces. A token may reach only one workspace, so running `auth login` again on the same profile with another workspace's token adds it to that profile instead of replacing the first one. `--workspace` then picks the matching token on its own.
 
 ```bash
 clickupc auth login                         # on a terminal: add a new profile or update an existing one

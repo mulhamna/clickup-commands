@@ -5,6 +5,7 @@ use serde_json::{json, Value};
 
 use super::{ClickUpClient, Query};
 use crate::{
+    config::ClickUpConfig,
     error::Result,
     model::{Folder, List, Space, User, Workspace},
 };
@@ -55,24 +56,7 @@ impl ClickUpClient {
 
     /// Find an authorized workspace by id or (case-insensitive) name.
     pub async fn find_workspace(&self, input: &str) -> Result<Workspace> {
-        let input = input.trim();
-        let all = self.workspaces().await?;
-        if let Some(w) = all
-            .iter()
-            .find(|w| w.id == input || w.name.eq_ignore_ascii_case(input))
-        {
-            return Ok(w.clone());
-        }
-        let names: Vec<String> = all.iter().map(|w| w.name.clone()).collect();
-        let mut suggestions = crate::resolve::suggest(input, &names);
-        if suggestions.is_empty() {
-            suggestions = names;
-        }
-        Err(crate::ClickUpError::resolve(
-            "workspace",
-            input,
-            suggestions,
-        ))
+        pick_workspace(self.workspaces().await?, input)
     }
 
     /// Members of the current workspace (from `GET /v2/team`).
@@ -216,4 +200,52 @@ impl ClickUpClient {
             .await?
             .tags)
     }
+}
+
+/// Workspaces reachable by any token of the profile, deduplicated by id.
+pub async fn workspaces_for(cfg: &ClickUpConfig) -> Result<Vec<Workspace>> {
+    let mut out: Vec<Workspace> = Vec::new();
+    for token in cfg.all_tokens() {
+        let mut c = cfg.clone();
+        c.token = Some(token);
+        for w in ClickUpClient::new(&c)?.workspaces().await? {
+            if !out.iter().any(|x| x.id == w.id) {
+                out.push(w);
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Point `cfg` at a workspace given by id or name, switching to that
+/// workspace's token when the profile has one. Ids skip the API call.
+pub async fn select_workspace(cfg: &mut ClickUpConfig, input: &str) -> Result<()> {
+    let input = input.trim();
+    let id = if !input.is_empty() && input.chars().all(|c| c.is_ascii_digit()) {
+        input.to_string()
+    } else {
+        pick_workspace(workspaces_for(cfg).await?, input)?.id
+    };
+    cfg.set_workspace(id);
+    Ok(())
+}
+
+fn pick_workspace(all: Vec<Workspace>, input: &str) -> Result<Workspace> {
+    let input = input.trim();
+    if let Some(w) = all
+        .iter()
+        .find(|w| w.id == input || w.name.eq_ignore_ascii_case(input))
+    {
+        return Ok(w.clone());
+    }
+    let names: Vec<String> = all.iter().map(|w| w.name.clone()).collect();
+    let mut suggestions = crate::resolve::suggest(input, &names);
+    if suggestions.is_empty() {
+        suggestions = names;
+    }
+    Err(crate::ClickUpError::resolve(
+        "workspace",
+        input,
+        suggestions,
+    ))
 }

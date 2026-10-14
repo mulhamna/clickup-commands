@@ -3,7 +3,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use clickupc_core::{
-    client::{UpdateTask, COMMENT_PAGE_SIZE},
+    client::{select_workspace, workspaces_for, UpdateTask, COMMENT_PAGE_SIZE},
     config::ClickUpConfig,
     filter::{FieldFilter, Range, TaskFilter},
     rate_limit::now_secs,
@@ -569,4 +569,38 @@ async fn find_workspace_by_name_or_id() {
         ClickUpError::Resolve { suggestions, .. } => assert_eq!(suggestions[0], "Side Project"),
         e => panic!("{e:?}"),
     }
+}
+
+#[tokio::test]
+async fn select_workspace_switches_to_its_token() {
+    let server = MockServer::start().await;
+    for (token, id, name) in [("pk_one", "111", "Acme"), ("pk_two", "222", "Side")] {
+        Mock::given(path("/v2/team"))
+            .and(header("authorization", token))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({ "teams": [{ "id": id, "name": name }] })),
+            )
+            .mount(&server)
+            .await;
+    }
+    let mut c = ClickUpConfig::with_token("pk_one", server.uri());
+    c.workspace_id = Some("111".into());
+    c.tokens.insert("111".into(), "pk_one".into());
+    c.tokens.insert("222".into(), "pk_two".into());
+
+    let names: Vec<String> = workspaces_for(&c)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|w| w.name)
+        .collect();
+    assert_eq!(names, ["Acme", "Side"]);
+
+    select_workspace(&mut c, "side").await.unwrap();
+    assert_eq!(c.workspace_id.as_deref(), Some("222"));
+    assert_eq!(c.token.as_deref(), Some("pk_two"));
+
+    select_workspace(&mut c, "111").await.unwrap();
+    assert_eq!(c.token.as_deref(), Some("pk_one"));
 }

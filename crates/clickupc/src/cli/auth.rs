@@ -3,7 +3,8 @@
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use clickupc_core::{
-    config::{mask_token, profile_slug, ClickUpConfig, ConfigFile},
+    client::workspaces_for,
+    config::{mask_token, profile_slug, ClickUpConfig, ConfigFile, Profile},
     ClickUpClient,
 };
 use serde_json::json;
@@ -74,7 +75,9 @@ pub async fn auth(ctx: &Ctx, cmd: AuthCmd) -> Result<()> {
         AuthCmd::Logout => {
             let mut file = ConfigFile::load()?;
             let name = profile_name(ctx, &file);
-            file.profile_mut(&name).token = None;
+            let p = file.profile_mut(&name);
+            p.token = None;
+            p.tokens.clear();
             file.save()?;
             println!("Removed token from profile '{name}'.");
             Ok(())
@@ -88,6 +91,15 @@ enum Target {
     Existing(String),
     /// New profile; `None` = ask for a name (suggested from the workspace).
     New(Option<String>),
+}
+
+/// Masked token, plus how many workspaces have their own token.
+fn token_label(p: &Profile) -> String {
+    let token = p.token.as_deref().map(mask_token).unwrap_or_default();
+    match p.tokens.len() {
+        0 | 1 => token,
+        n => format!("{token} (+{} workspace tokens)", n - 1),
+    }
 }
 
 fn profile_label(name: &str, file: &ConfigFile) -> String {
@@ -220,8 +232,7 @@ pub async fn login(ctx: &Ctx, token: Option<String>, offer_mcp: bool) -> Result<
     };
 
     let p = file.profile_mut(&name);
-    p.token = Some(token);
-    p.workspace_id = Some(chosen.id.clone());
+    p.add_token(&chosen.id, token);
     if p.timezone.is_none() {
         p.timezone = user.timezone.clone();
     }
@@ -314,7 +325,7 @@ fn profile(ctx: &Ctx, cmd: ProfileCmd) -> Result<()> {
                         if *name == current { "*" } else { "" }.to_string(),
                         name.clone(),
                         p.workspace_id.clone().unwrap_or_default(),
-                        p.token.as_deref().map(mask_token).unwrap_or_default(),
+                        token_label(p),
                     ]
                 }),
             );
@@ -408,7 +419,7 @@ pub async fn whoami(ctx: &Ctx) -> Result<()> {
 
 pub async fn workspace(ctx: &Ctx, cmd: WorkspaceCmd) -> Result<()> {
     let s = ctx.session().await?;
-    let list = s.client.workspaces().await?;
+    let list = workspaces_for(&s.cfg).await?;
     match cmd {
         WorkspaceCmd::List => {
             if ctx.json {
