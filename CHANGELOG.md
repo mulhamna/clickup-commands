@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.3.0](https://github.com/mulhamna/clickup-commands/compare/v1.2.0...v1.3.0) (2026-10-15)
+
+
+### Features
+
+* **cli:** accept several workspaces in workspace use ([90663a8](https://github.com/mulhamna/clickup-commands/commit/90663a8b21295082c0dd2ae8741da4ad399daad8))
+* **cli:** fan out task list and standup over active workspaces ([f61993a](https://github.com/mulhamna/clickup-commands/commit/f61993a6a2afefeb874e2b384f9966d6de7fb81b))
+* **core:** add active_workspaces to profiles ([d549988](https://github.com/mulhamna/clickup-commands/commit/d5499882b3b169fcaf935e3b8f99e701c688169d))
+* **mcp:** fan out task search and standup over active workspaces ([2a81bf0](https://github.com/mulhamna/clickup-commands/commit/2a81bf078f3c1653640b0ed298ac4cf314072d45))
+* query several active workspaces per profile ([9006a0c](https://github.com/mulhamna/clickup-commands/commit/9006a0cb6be8248a9fe8e070d266a9dd86a4e09d))
+
+
+### Bug Fixes
+
+* **core:** leave multi-workspace mode on login ([8abe0d7](https://github.com/mulhamna/clickup-commands/commit/8abe0d7df8dc3a51b3b2fef48445552bd00358d3))
+
 ## [1.2.0](https://github.com/mulhamna/clickup-commands/compare/v1.1.0...v1.2.0) (2026-10-14)
 
 
