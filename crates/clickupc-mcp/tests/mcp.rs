@@ -367,3 +367,106 @@ async fn workspace_param_resolves_name() {
     client.cancel().await.unwrap();
     server.await.unwrap();
 }
+
+/// `work` with two active workspaces: 111 (pk_work…) and 222 (pk_two…).
+fn multi_workspace_profile(env: &Env, base_url: &str) {
+    let dir = env._dir.path().join("config");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("config.toml"),
+        "current_profile = \"work\"\n\
+         [profiles.work]\ntoken = \"pk_work_aaaaaaaa\"\nworkspace_id = \"111\"\n\
+         active_workspaces = [\"111\", \"222\"]\n\
+         [profiles.work.tokens]\n\"111\" = \"pk_work_aaaaaaaa\"\n\"222\" = \"pk_two_cccccccc\"\n",
+    )
+    .unwrap();
+    std::env::remove_var("CLICKUP_TOKEN");
+    std::env::remove_var("CLICKUP_WORKSPACE_ID");
+    std::env::set_var("CLICKUP_BASE_URL", base_url);
+}
+
+async fn mount_team_tasks(mock: &MockServer, ws: &str, token: &str, task: &str) {
+    Mock::given(method("GET"))
+        .and(path(format!("/v2/team/{ws}/task")))
+        .and(wiremock::matchers::header("authorization", token))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "tasks": [{ "id": task, "name": task, "status": { "status": "open" } }],
+            "last_page": true
+        })))
+        .mount(mock)
+        .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn task_search_fans_out_over_active_workspaces() {
+    let mock = MockServer::start().await;
+    Mock::given(path("/v2/team"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "teams": [
+            { "id": "111", "name": "Acme" }, { "id": "222", "name": "Side" }
+        ]})))
+        .mount(&mock)
+        .await;
+    mount_team_tasks(&mock, "111", "pk_work_aaaaaaaa", "t1").await;
+    mount_team_tasks(&mock, "222", "pk_two_cccccccc", "t2").await;
+    let env = Env::new(None);
+    multi_workspace_profile(&env, &mock.uri());
+    let (client, server) = connect().await;
+
+    let out = call(&client, "clickup_task_search", json!({}))
+        .await
+        .unwrap();
+    let tasks = out["result"]["tasks"].as_array().unwrap();
+    let got: Vec<(&str, &str)> = tasks
+        .iter()
+        .map(|t| (t["workspace"].as_str().unwrap(), t["id"].as_str().unwrap()))
+        .collect();
+    assert_eq!(got, vec![("Acme", "t1"), ("Side", "t2")]);
+    assert_eq!(out["result"]["skipped"], json!([]));
+
+    // An explicit workspace keeps the single-workspace shape.
+    let one = call(
+        &client,
+        "clickup_task_search",
+        json!({ "workspace": "222" }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(one["result"]["count"], json!(1));
+    assert!(one["result"]["tasks"][0].get("workspace").is_none());
+    assert!(one["result"].get("skipped").is_none());
+
+    client.cancel().await.unwrap();
+    server.await.unwrap();
+}
+
+#[tokio::test]
+#[serial]
+async fn task_search_skips_failing_workspace() {
+    let mock = MockServer::start().await;
+    Mock::given(path("/v2/team"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "teams": [] })))
+        .mount(&mock)
+        .await;
+    mount_team_tasks(&mock, "111", "pk_work_aaaaaaaa", "t1").await;
+    Mock::given(path("/v2/team/222/task"))
+        .respond_with(ResponseTemplate::new(401).set_body_json(json!({
+            "err": "Team not authorized", "ECODE": "OAUTH_027"
+        })))
+        .mount(&mock)
+        .await;
+    let env = Env::new(None);
+    multi_workspace_profile(&env, &mock.uri());
+    let (client, server) = connect().await;
+
+    let out = call(&client, "clickup_task_search", json!({}))
+        .await
+        .unwrap();
+    assert_eq!(out["result"]["count"], json!(1));
+    // Without names the label falls back to the id.
+    assert_eq!(out["result"]["tasks"][0]["workspace"], json!("111"));
+    assert_eq!(out["result"]["skipped"][0]["workspace"], json!("222"));
+
+    client.cancel().await.unwrap();
+    server.await.unwrap();
+}
