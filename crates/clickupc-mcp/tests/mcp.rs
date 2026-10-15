@@ -470,3 +470,48 @@ async fn task_search_skips_failing_workspace() {
     client.cancel().await.unwrap();
     server.await.unwrap();
 }
+
+#[tokio::test]
+#[serial]
+async fn standup_returns_one_entry_per_active_workspace() {
+    let mock = MockServer::start().await;
+    Mock::given(path("/v2/team"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "teams": [
+            { "id": "111", "name": "Acme" }, { "id": "222", "name": "Side" }
+        ]})))
+        .mount(&mock)
+        .await;
+    Mock::given(path("/v2/user"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "user": { "id": 7, "username": "ana" } })),
+        )
+        .mount(&mock)
+        .await;
+    mount_team_tasks(&mock, "111", "pk_work_aaaaaaaa", "t1").await;
+    mount_team_tasks(&mock, "222", "pk_two_cccccccc", "t2").await;
+    let env = Env::new(None);
+    multi_workspace_profile(&env, &mock.uri());
+    let (client, server) = connect().await;
+
+    let out = call(&client, "clickup_standup", json!({})).await.unwrap();
+    let ws: Vec<&str> = out["result"]["workspaces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["workspace"].as_str().unwrap())
+        .collect();
+    assert_eq!(ws, vec!["Acme", "Side"]);
+    assert_eq!(out["result"]["workspaces"][0]["user"], json!("ana"));
+    assert_eq!(out["result"]["skipped"], json!([]));
+
+    // A workspace argument keeps the single standup shape.
+    let one = call(&client, "clickup_standup", json!({ "workspace": "111" }))
+        .await
+        .unwrap();
+    assert_eq!(one["result"]["user"], json!("ana"));
+    assert!(one["result"].get("workspaces").is_none());
+
+    client.cancel().await.unwrap();
+    server.await.unwrap();
+}
