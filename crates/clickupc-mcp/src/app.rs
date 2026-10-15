@@ -58,6 +58,37 @@ impl Ctx {
         Ok(Self { cfg, client })
     }
 
+    /// One context per active workspace, labelled with its name, for read
+    /// tools. `None` in single-workspace mode (fewer than two active
+    /// workspaces, or `workspace` given), so callers keep their usual path.
+    pub async fn load_multi(acc: &Account) -> AppResult<Option<Vec<(String, Self)>>> {
+        if acc
+            .workspace
+            .as_deref()
+            .is_some_and(|w| !w.trim().is_empty())
+        {
+            return Ok(None);
+        }
+        let cfg = load_config(acc.profile.as_deref())?;
+        let cfgs = cfg.fan_out();
+        if cfgs.len() < 2 {
+            return Ok(None);
+        }
+        // ponytail: a failed name lookup only costs the label; ids still work.
+        let names: HashMap<String, String> = workspaces_for(&cfg)
+            .await
+            .map(|ws| ws.into_iter().map(|w| (w.id, w.name)).collect())
+            .unwrap_or_default();
+        let mut out = Vec::new();
+        for cfg in cfgs {
+            let id = cfg.workspace_id.clone().unwrap_or_default();
+            let token = cfg.token()?.to_string();
+            let client = ClickUpClient::new(&cfg)?.with_limiter(limiter_for(&token));
+            out.push((names.get(&id).cloned().unwrap_or(id), Self { cfg, client }));
+        }
+        Ok(Some(out))
+    }
+
     pub fn resolver(&self) -> AppResult<Resolver<'_>> {
         Ok(Resolver::new(&self.client, &self.cfg)?)
     }
@@ -407,7 +438,48 @@ pub fn profile_list() -> AppResult<Value> {
 
 // ── tasks ────────────────────────────────────────────────────────────────
 
+/// Workspaces that failed in a multi-workspace read. Errors when all of them
+/// failed; otherwise lists them so the caller can report what was skipped.
+fn skipped(errors: Vec<(String, AppError)>, total: usize) -> AppResult<Vec<Value>> {
+    if errors.len() == total {
+        return Err(errors
+            .into_iter()
+            .next()
+            .map(|(_, e)| e)
+            .unwrap_or_else(|| AppError::config_error("no active workspaces")));
+    }
+    Ok(errors
+        .into_iter()
+        .map(|(ws, e)| json!({ "workspace": ws, "error": e.to_mcp().message }))
+        .collect())
+}
+
 pub async fn task_search(a: TaskSearchArgs) -> AppResult<Value> {
+    if let Some(all) = Ctx::load_multi(&a.account).await? {
+        let full = is_full(&a.detail);
+        let (mut items, mut errors) = (Vec::new(), Vec::new());
+        let total = all.len();
+        for (ws, ctx) in all {
+            let found = match ctx.resolver() {
+                Ok(r) => ops::search(&r, &search_input(&a))
+                    .await
+                    .map_err(AppError::from),
+                Err(e) => Err(e),
+            };
+            match found {
+                Ok(tasks) => {
+                    for t in &tasks {
+                        let mut v = task_out(t, full, ctx.tz())?;
+                        v["workspace"] = json!(ws);
+                        items.push(v);
+                    }
+                }
+                Err(e) => errors.push((ws, e)),
+            }
+        }
+        let skipped = skipped(errors, total)?;
+        return Ok(json!({ "count": items.len(), "tasks": items, "skipped": skipped }));
+    }
     let ctx = Ctx::load(&a.account).await?;
     let r = ctx.resolver()?;
     let tasks = ops::search(&r, &search_input(&a)).await?;
@@ -955,7 +1027,25 @@ pub async fn time_in_status(a: TimeInStatusArgs) -> AppResult<Value> {
 // ── reports ──────────────────────────────────────────────────────────────
 
 pub async fn standup(a: StandupArgs) -> AppResult<Value> {
-    let ctx = Ctx::load(&a.account).await?;
+    if let Some(all) = Ctx::load_multi(&a.account).await? {
+        let (mut items, mut errors) = (Vec::new(), Vec::new());
+        let total = all.len();
+        for (ws, ctx) in all {
+            match standup_for(&ctx, &a).await {
+                Ok(mut v) => {
+                    v["workspace"] = json!(ws);
+                    items.push(v);
+                }
+                Err(e) => errors.push((ws, e)),
+            }
+        }
+        let skipped = skipped(errors, total)?;
+        return Ok(json!({ "workspaces": items, "skipped": skipped }));
+    }
+    standup_for(&Ctx::load(&a.account).await?, &a).await
+}
+
+async fn standup_for(ctx: &Ctx, a: &StandupArgs) -> AppResult<Value> {
     let r = ctx.resolver()?;
     let s = ops::standup(
         &r,
