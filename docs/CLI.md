@@ -30,6 +30,7 @@ clickupc whoami                                       # user id, username, email
 ```
 clickupc workspace list
 clickupc workspace use [<name|id>]                   # set workspace_id on current profile (picker when omitted)
+clickupc workspace use <ws> <ws>...                  # multi-workspace: task list + standup query all; first = default for writes
 clickupc tree [--space <s>] [--archived]             # Space → Folder → List tree with ids
 clickupc space list
 clickupc folder list --space <s>
