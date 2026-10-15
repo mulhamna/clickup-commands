@@ -201,7 +201,7 @@ impl ClickUpMcpServer {
 
     #[tool(
         name = "clickup_task_search",
-        description = "Search tasks by list/folder/space, status, assignee, tag, dates, custom fields and task type. Names are resolved for you. Returns compact summaries (detail='full' for everything). Closed tasks need include_closed=true."
+        description = "Search tasks by list/folder/space, status, assignee, tag, dates, custom fields and task type. Names are resolved for you. Returns compact summaries (detail='full' for everything). Closed tasks need include_closed=true. If the profile has several active workspaces and no `workspace` is given, searches all of them: each task gets a `workspace` name and failed workspaces are listed in `skipped`."
     )]
     pub async fn clickup_task_search(
         &self,
@@ -599,7 +599,7 @@ impl ClickUpMcpServer {
 
     #[tool(
         name = "clickup_standup",
-        description = "Standup summary for a user (default me): tasks closed and updated since (default yesterday), in progress, due within 3 days, overdue."
+        description = "Standup summary for a user (default me): tasks closed and updated since (default yesterday), in progress, due within 3 days, overdue. With several active workspaces (and no `workspace`), returns one standup per workspace under `workspaces`."
     )]
     pub async fn clickup_standup(
         &self,

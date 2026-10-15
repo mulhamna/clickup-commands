@@ -5,6 +5,7 @@ use clap::Subcommand;
 use clickupc_core::{
     client::workspaces_for,
     config::{mask_token, profile_slug, ClickUpConfig, ConfigFile, Profile},
+    model::Workspace,
     ClickUpClient,
 };
 use serde_json::json;
@@ -47,10 +48,12 @@ pub enum ProfileCmd {
 pub enum WorkspaceCmd {
     /// List workspaces the token can access
     List,
-    /// Set the workspace for the current profile (picker when omitted)
+    /// Set the workspace for the current profile (picker when omitted).
+    /// Two or more make task search and standup query all of them; the
+    /// first stays the default for everything else.
     Use {
         #[arg(value_name = "WORKSPACE")]
-        target: Option<String>,
+        targets: Vec<String>,
     },
 }
 
@@ -426,11 +429,20 @@ pub async fn workspace(ctx: &Ctx, cmd: WorkspaceCmd) -> Result<()> {
                 return print_json(&list);
             }
             let current = s.cfg.workspace_id.clone().unwrap_or_default();
+            let mark = |id: &str| {
+                if id == current {
+                    "*"
+                } else if s.cfg.active_workspaces.iter().any(|a| a == id) {
+                    "+"
+                } else {
+                    ""
+                }
+            };
             print_table(
                 &["", "ID", "Name", "Members"],
                 list.iter().map(|w| {
                     vec![
-                        if w.id == current { "*" } else { "" }.to_string(),
+                        mark(&w.id).to_string(),
                         w.id.clone(),
                         w.name.clone(),
                         w.members.len().to_string(),
@@ -438,8 +450,36 @@ pub async fn workspace(ctx: &Ctx, cmd: WorkspaceCmd) -> Result<()> {
                 }),
             );
         }
-        WorkspaceCmd::Use { target } => {
-            let w = match target {
+        WorkspaceCmd::Use { targets } if targets.len() > 1 => {
+            let mut picked: Vec<&Workspace> = Vec::new();
+            for t in &targets {
+                let w = list
+                    .iter()
+                    .find(|x| x.id == *t || x.name.eq_ignore_ascii_case(t))
+                    .with_context(|| format!("workspace '{t}' not found"))?;
+                if !picked.iter().any(|p| p.id == w.id) {
+                    picked.push(w);
+                }
+            }
+            let mut file = ConfigFile::load()?;
+            let name = profile_name(ctx, &file);
+            let p = file.profile_mut(&name);
+            p.workspace_id = Some(picked[0].id.clone());
+            p.active_workspaces = if picked.len() > 1 {
+                picked.iter().map(|w| w.id.clone()).collect()
+            } else {
+                Vec::new()
+            };
+            file.save()?;
+            let names: Vec<&str> = picked.iter().map(|w| w.name.as_str()).collect();
+            println!(
+                "Profile '{name}' now reads from: {}. Default for writes: '{}'.",
+                names.join(", "),
+                picked[0].name
+            );
+        }
+        WorkspaceCmd::Use { targets } => {
+            let w = match targets.into_iter().next() {
                 Some(t) => list
                     .iter()
                     .find(|x| x.id == t || x.name.eq_ignore_ascii_case(&t))
@@ -462,7 +502,9 @@ pub async fn workspace(ctx: &Ctx, cmd: WorkspaceCmd) -> Result<()> {
             };
             let mut file = ConfigFile::load()?;
             let name = profile_name(ctx, &file);
-            file.profile_mut(&name).workspace_id = Some(w.id.clone());
+            let p = file.profile_mut(&name);
+            p.workspace_id = Some(w.id.clone());
+            p.active_workspaces.clear();
             file.save()?;
             println!(
                 "Profile '{name}' now uses workspace '{}' ({}).",
@@ -526,7 +568,10 @@ pub fn config(ctx: &Ctx, cmd: ConfigCmd) -> Result<()> {
                 "default_task_limit" => {
                     p.default_task_limit = if clear { None } else { Some(value.parse()?) }
                 }
-                "workspace_id" => p.workspace_id = (!clear).then(|| value.clone()),
+                "workspace_id" => {
+                    p.workspace_id = (!clear).then(|| value.clone());
+                    p.active_workspaces.clear();
+                }
                 other => bail!("unknown key '{other}' (one of {})", KEYS.join(", ")),
             }
             file.save()?;

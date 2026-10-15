@@ -39,12 +39,18 @@ pub struct Profile {
     /// workspace. `token` is the fallback for workspaces not listed here.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub tokens: BTreeMap<String, String>,
+    /// Workspaces that read commands (task search, standup) query together.
+    /// Fewer than two means single-workspace mode on `workspace_id`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub active_workspaces: Vec<String>,
 }
 
 impl Profile {
     /// Store `token` for `workspace_id` and make it the default. A legacy
     /// single token is kept under its own workspace so it keeps working.
+    /// Like any single-workspace pick, it leaves multi-workspace mode.
     pub fn add_token(&mut self, workspace_id: &str, token: String) {
+        self.active_workspaces.clear();
         if let (Some(old), Some(ws)) = (&self.token, &self.workspace_id) {
             self.tokens.entry(ws.clone()).or_insert_with(|| old.clone());
         }
@@ -175,6 +181,8 @@ pub struct ClickUpConfig {
     pub aliases: BTreeMap<String, String>,
     /// Per-workspace tokens of the profile; empty when `CLICKUP_TOKEN` is set.
     pub tokens: BTreeMap<String, String>,
+    /// Profile's `active_workspaces`; empty when `CLICKUP_WORKSPACE_ID` is set.
+    pub active_workspaces: Vec<String>,
     pub base_url: String,
     pub cache_dir: PathBuf,
     pub config_path: PathBuf,
@@ -210,7 +218,13 @@ impl ClickUpConfig {
         } else {
             p.tokens
         };
-        let workspace_id = env("CLICKUP_WORKSPACE_ID").or(p.workspace_id);
+        let env_workspace = env("CLICKUP_WORKSPACE_ID");
+        let active_workspaces = if env_workspace.is_some() {
+            Vec::new()
+        } else {
+            p.active_workspaces
+        };
+        let workspace_id = env_workspace.or(p.workspace_id);
         let token = env_token
             .or_else(|| workspace_id.as_ref().and_then(|w| tokens.get(w).cloned()))
             .or(p.token);
@@ -219,6 +233,7 @@ impl ClickUpConfig {
             token,
             workspace_id,
             tokens,
+            active_workspaces,
             default_list: env("CLICKUP_DEFAULT_LIST").or(p.default_list),
             timezone: env("CLICKUP_TIMEZONE").or(p.timezone),
             timeout_secs: env_parse("CLICKUP_TIMEOUT_SECS")?
@@ -244,6 +259,7 @@ impl ClickUpConfig {
             default_task_limit: None,
             aliases: BTreeMap::new(),
             tokens: BTreeMap::new(),
+            active_workspaces: Vec::new(),
             base_url: base_url.into(),
             cache_dir: std::env::temp_dir().join("clickupc"),
             config_path: PathBuf::new(),
@@ -268,12 +284,30 @@ impl ClickUpConfig {
     }
 
     /// Switch to `workspace_id`, and to its own token when the profile has one.
+    /// Picking one workspace also leaves multi-workspace mode.
     pub fn set_workspace(&mut self, workspace_id: impl Into<String>) {
+        self.active_workspaces.clear();
         let id = workspace_id.into();
         if let Some(t) = self.tokens.get(&id) {
             self.token = Some(t.clone());
         }
         self.workspace_id = Some(id);
+    }
+
+    /// One config per active workspace when the profile has two or more,
+    /// each with that workspace's token; otherwise just this config.
+    pub fn fan_out(&self) -> Vec<ClickUpConfig> {
+        if self.active_workspaces.len() < 2 {
+            return vec![self.clone()];
+        }
+        self.active_workspaces
+            .iter()
+            .map(|id| {
+                let mut c = self.clone();
+                c.set_workspace(id.clone());
+                c
+            })
+            .collect()
     }
 
     /// Every distinct token of the profile, the active one first.
@@ -434,6 +468,50 @@ mod tests {
         let mut cfg = ClickUpConfig::from_file(&file, None).unwrap();
         cfg.set_workspace("1");
         assert_eq!(cfg.token.as_deref(), Some("pk_env"));
+        isolated();
+    }
+
+    #[test]
+    #[serial]
+    fn active_workspaces_fan_out() {
+        let _dir = isolated();
+        let mut file = ConfigFile::default();
+        let p = file.profile_mut("default");
+        p.token = Some("pk_one".into());
+        p.workspace_id = Some("1".into());
+        p.add_token("2", "pk_two".into());
+
+        // Single-workspace profile: unchanged behavior.
+        let cfg = ClickUpConfig::from_file(&file, None).unwrap();
+        assert_eq!(cfg.fan_out().len(), 1);
+
+        file.profile_mut("default").active_workspaces = vec!["1".into(), "2".into()];
+        let cfg = ClickUpConfig::from_file(&file, None).unwrap();
+        let all: Vec<_> = cfg
+            .fan_out()
+            .into_iter()
+            .map(|c| (c.workspace_id.unwrap(), c.token.unwrap()))
+            .collect();
+        assert_eq!(
+            all,
+            vec![("1".into(), "pk_one".into()), ("2".into(), "pk_two".into())]
+        );
+
+        // An explicit workspace drops back to single mode.
+        let mut one = cfg.clone();
+        one.set_workspace("2");
+        assert_eq!(one.fan_out().len(), 1);
+
+        // Logging in to another workspace picks it as the single default.
+        let mut relogin = file.clone();
+        relogin
+            .profile_mut("default")
+            .add_token("3", "pk_three".into());
+        assert!(relogin.profiles["default"].active_workspaces.is_empty());
+
+        std::env::set_var("CLICKUP_WORKSPACE_ID", "1");
+        let cfg = ClickUpConfig::from_file(&file, None).unwrap();
+        assert_eq!(cfg.fan_out().len(), 1);
         isolated();
     }
 

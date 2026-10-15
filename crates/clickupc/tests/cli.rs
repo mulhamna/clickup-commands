@@ -306,3 +306,64 @@ async fn first_login_honors_clickup_profile_env() {
     assert!(cfg.contains("[profiles.work]"), "{cfg}");
     assert!(!cfg.contains("[profiles.default]"), "{cfg}");
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn workspace_use_many_fans_out_task_list() {
+    let server = MockServer::start().await;
+    Mock::given(path("/v2/team"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "teams": [
+            { "id": "111", "name": "Acme" }, { "id": "222", "name": "Side" }
+        ]})))
+        .mount(&server)
+        .await;
+    for (ws, token) in [("111", "pk_one_aaaaaaaa"), ("222", "pk_two_bbbbbbbb")] {
+        Mock::given(method("GET"))
+            .and(path(format!("/v2/team/{ws}/task")))
+            .and(wiremock::matchers::header("authorization", token))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "tasks": [{ "id": format!("t{ws}"), "name": "x", "status": { "status": "open" } }],
+                "last_page": true
+            })))
+            .mount(&server)
+            .await;
+    }
+    let env = Env::new(None);
+    let dir = env.dir.path().join("config");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("config.toml"),
+        "[profiles.default]\ntoken = \"pk_one_aaaaaaaa\"\nworkspace_id = \"111\"\n\
+         [profiles.default.tokens]\n\"111\" = \"pk_one_aaaaaaaa\"\n\"222\" = \"pk_two_bbbbbbbb\"\n",
+    )
+    .unwrap();
+    let run = |args: &'static [&'static str]| {
+        let mut c = env.cmd(args);
+        c.env("CLICKUP_BASE_URL", server.uri());
+        tokio::task::spawn_blocking(move || c.output().unwrap())
+    };
+    let config = || std::fs::read_to_string(dir.join("config.toml")).unwrap();
+
+    let o = run(&["workspace", "use", "Acme", "Side"]).await.unwrap();
+    assert!(o.status.success(), "{o:?}");
+    assert!(config().contains("active_workspaces"));
+
+    let o = run(&["task", "list", "--json"]).await.unwrap();
+    assert!(o.status.success(), "{o:?}");
+    let v: Value = serde_json::from_str(&stdout(&o)).unwrap();
+    let got: Vec<(&str, &str)> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| (t["workspace"].as_str().unwrap(), t["id"].as_str().unwrap()))
+        .collect();
+    assert_eq!(got, vec![("Acme", "t111"), ("Side", "t222")]);
+
+    // Back to one workspace: plain output, no workspace key.
+    let o = run(&["workspace", "use", "Side"]).await.unwrap();
+    assert!(o.status.success(), "{o:?}");
+    assert!(!config().contains("active_workspaces"));
+    let o = run(&["task", "list", "--json"]).await.unwrap();
+    let v: Value = serde_json::from_str(&stdout(&o)).unwrap();
+    assert_eq!(v[0]["id"], json!("t222"));
+    assert!(v[0].get("workspace").is_none());
+}

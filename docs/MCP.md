@@ -51,7 +51,7 @@ Phase tags refer to `docs/ROADMAP.md`. "Official" = equivalent exists in ClickUp
 
 | Tool | Input | Notes | Official |
 | --- | --- | --- | --- |
-| `clickup_task_search` | `lists?`, `folders?`, `spaces?`, `statuses?`, `include_closed?`, `assignees?`, `tags?`, `due_before?`, `due_after?`, `created_*?`, `updated_*?`, `done_*?`, `custom_fields?: [{field, op, value}]`, `task_types?`, `parent?`, `subtasks?`, `order_by?`, `reverse?`, `limit?` (default 50, max 500), `detail?` | Picks list vs team endpoint; paginates | ✓ |
+| `clickup_task_search` | `lists?`, `folders?`, `spaces?`, `statuses?`, `include_closed?`, `assignees?`, `tags?`, `due_before?`, `due_after?`, `created_*?`, `updated_*?`, `done_*?`, `custom_fields?: [{field, op, value}]`, `task_types?`, `parent?`, `subtasks?`, `order_by?`, `reverse?`, `limit?` (default 50, max 500), `detail?` | Picks list vs team endpoint; paginates. Profile with 2+ `active_workspaces` and no `workspace`: queries each, tags tasks with `workspace`, lists failures in `skipped` | ✓ |
 | `clickup_task_get` | `task`, `detail?`, `include_subtasks?`, `include_comments?` | `task` = id, custom id, or URL | ✓ |
 | `clickup_task_create` | `list`, `name`, `description?` (markdown), `status?`, `priority?` (`urgent\|high\|normal\|low`), `assignees?`, `tags?`, `due?`, `start?`, `estimate?` (`"2h"`), `points?`, `parent?`, `task_type?`, `custom_fields?: {name_or_id: value}` | | ✓ |
 | `clickup_task_update` | `task`, any of create's fields (except list), `assignees_add?`, `assignees_remove?`, `watchers_add?`, `watchers_remove?`, `archived?` | `custom_fields` here are applied via Set Custom Field after the update, results reported per field | ✓ |
@@ -114,7 +114,7 @@ Phase tags refer to `docs/ROADMAP.md`. "Official" = equivalent exists in ClickUp
 
 | Tool | Input | Notes | Official |
 | --- | --- | --- | --- |
-| `clickup_standup` | `since?` (default yesterday), `user?` | my tasks closed/updated since, in progress, due soon, overdue | — |
+| `clickup_standup` | `since?` (default yesterday), `user?` | my tasks closed/updated since, in progress, due soon, overdue. Multi-workspace profile: `{workspaces: [...], skipped}` | — |
 | `clickup_list_summary` | `list` | counts by status / assignee, overdue count | — |
 
 ### Docs (P5)

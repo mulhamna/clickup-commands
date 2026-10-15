@@ -378,33 +378,77 @@ fn task_ref(s: &str) -> Result<TaskRef> {
     Ok(s.parse::<TaskRef>()?)
 }
 
+const TASK_HEADERS: [&str; 7] = [
+    "ID",
+    "Name",
+    "Status",
+    "Assignees",
+    "Due",
+    "Priority",
+    "List",
+];
+
+fn task_row(t: &Task, tz: Option<&str>) -> Vec<String> {
+    vec![
+        t.display_id().to_string(),
+        t.name.clone(),
+        t.status.status.clone(),
+        t.assignees
+            .iter()
+            .map(|u| u.display())
+            .collect::<Vec<_>>()
+            .join(", "),
+        opt(t.due_date.map(|d| format_ms(d, tz))),
+        opt(t.priority_name()),
+        opt(t.list.as_ref().and_then(|l| l.name.clone())),
+    ]
+}
+
 fn tasks_table(tasks: &[Task], tz: Option<&str>) {
+    print_table(&TASK_HEADERS, tasks.iter().map(|t| task_row(t, tz)));
+}
+
+/// `task list` across the profile's active workspaces. A workspace where the
+/// filter can't run (e.g. the list name only exists elsewhere) is skipped
+/// with a warning; the command fails only when every workspace fails.
+async fn list_multi(ctx: &Ctx, sessions: &[(String, Session)], filter: &FilterArgs) -> Result<()> {
+    let mut rows: Vec<(&str, Task)> = Vec::new();
+    let mut errors = Vec::new();
+    for (ws, s) in sessions {
+        match ops::search(&s.resolver()?, &filter.input(s)).await {
+            Ok(tasks) => rows.extend(tasks.into_iter().map(|t| (ws.as_str(), t))),
+            Err(e) => {
+                eprintln!("warning: skipped workspace '{ws}': {e}");
+                errors.push(e);
+            }
+        }
+    }
+    if errors.len() == sessions.len() {
+        return Err(errors.remove(0).into());
+    }
+    let tz = sessions[0].1.tz();
+    if ctx.json {
+        let out = rows
+            .iter()
+            .map(|(ws, t)| {
+                let mut v = serde_json::to_value(t)?;
+                v["workspace"] = json!(ws);
+                Ok(v)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        return print_json(&out);
+    }
+    let headers: Vec<&str> = ["Workspace"].into_iter().chain(TASK_HEADERS).collect();
     print_table(
-        &[
-            "ID",
-            "Name",
-            "Status",
-            "Assignees",
-            "Due",
-            "Priority",
-            "List",
-        ],
-        tasks.iter().map(|t| {
-            vec![
-                t.display_id().to_string(),
-                t.name.clone(),
-                t.status.status.clone(),
-                t.assignees
-                    .iter()
-                    .map(|u| u.display())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                opt(t.due_date.map(|d| format_ms(d, tz))),
-                opt(t.priority_name()),
-                opt(t.list.as_ref().and_then(|l| l.name.clone())),
-            ]
+        &headers,
+        rows.iter().map(|(ws, t)| {
+            let mut row = vec![ws.to_string()];
+            row.extend(task_row(t, tz));
+            row
         }),
     );
+    eprintln!("{} task(s) in {} workspace(s)", rows.len(), sessions.len());
+    Ok(())
 }
 
 fn progress(n: usize) -> ProgressBar {
@@ -417,6 +461,11 @@ fn progress(n: usize) -> ProgressBar {
 }
 
 pub async fn run(ctx: &Ctx, cmd: TaskCmd) -> Result<()> {
+    if let TaskCmd::List { filter } = &cmd {
+        if let Some(sessions) = ctx.multi_sessions().await? {
+            return list_multi(ctx, &sessions, filter).await;
+        }
+    }
     let s = ctx.session().await?;
     let r = s.resolver()?;
     let tz = s.tz().map(str::to_string);
