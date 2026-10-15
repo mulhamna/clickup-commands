@@ -48,7 +48,9 @@ pub struct Profile {
 impl Profile {
     /// Store `token` for `workspace_id` and make it the default. A legacy
     /// single token is kept under its own workspace so it keeps working.
+    /// Like any single-workspace pick, it leaves multi-workspace mode.
     pub fn add_token(&mut self, workspace_id: &str, token: String) {
+        self.active_workspaces.clear();
         if let (Some(old), Some(ws)) = (&self.token, &self.workspace_id) {
             self.tokens.entry(ws.clone()).or_insert_with(|| old.clone());
         }
@@ -499,6 +501,13 @@ mod tests {
         let mut one = cfg.clone();
         one.set_workspace("2");
         assert_eq!(one.fan_out().len(), 1);
+
+        // Logging in to another workspace picks it as the single default.
+        let mut relogin = file.clone();
+        relogin
+            .profile_mut("default")
+            .add_token("3", "pk_three".into());
+        assert!(relogin.profiles["default"].active_workspaces.is_empty());
 
         std::env::set_var("CLICKUP_WORKSPACE_ID", "1");
         let cfg = ClickUpConfig::from_file(&file, None).unwrap();
