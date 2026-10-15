@@ -5,10 +5,14 @@ pub mod mcp;
 pub mod report;
 pub mod task;
 
-use std::io::Read;
+use std::{collections::HashMap, io::Read};
 
 use anyhow::{Context, Result};
-use clickupc_core::{client::select_workspace, config::ClickUpConfig, ClickUpClient, Resolver};
+use clickupc_core::{
+    client::{select_workspace, workspaces_for},
+    config::ClickUpConfig,
+    ClickUpClient, Resolver,
+};
 
 /// Global flags shared by every command.
 #[derive(Debug, Clone)]
@@ -54,6 +58,38 @@ impl Ctx {
             client,
             refresh: self.refresh,
         })
+    }
+
+    /// One session per active workspace, labelled with its name, for read
+    /// commands. `None` in single-workspace mode (fewer than two active
+    /// workspaces, or `--workspace` given), so callers keep their usual path.
+    pub async fn multi_sessions(&self) -> Result<Option<Vec<(String, Session)>>> {
+        if self.workspace.is_some() {
+            return Ok(None);
+        }
+        let cfg = self.config()?;
+        let cfgs = cfg.fan_out();
+        if cfgs.len() < 2 {
+            return Ok(None);
+        }
+        // ponytail: a failed name lookup only costs the label; ids still work.
+        let names: HashMap<String, String> = workspaces_for(&cfg)
+            .await
+            .map(|ws| ws.into_iter().map(|w| (w.id, w.name)).collect())
+            .unwrap_or_default();
+        cfgs.into_iter()
+            .map(|cfg| {
+                let id = cfg.workspace_id.clone().unwrap_or_default();
+                let label = names.get(&id).cloned().unwrap_or(id);
+                let session = Session {
+                    client: ClickUpClient::new(&cfg)?,
+                    cfg,
+                    refresh: self.refresh,
+                };
+                Ok((label, session))
+            })
+            .collect::<Result<Vec<_>>>()
+            .map(Some)
     }
 }
 

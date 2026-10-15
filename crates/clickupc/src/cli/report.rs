@@ -3,9 +3,9 @@
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
 use clickupc_core::{client::DocParent, model::Task, ops, time::format_ms};
-use serde_json::Value;
+use serde_json::{json, Value};
 
-use super::{file_or_stdin, Ctx};
+use super::{file_or_stdin, Ctx, Session};
 use crate::output::{confirm, opt, print_json, print_table};
 
 #[derive(Debug, Subcommand)]
@@ -84,6 +84,9 @@ fn section(title: &str, tasks: &[Task], tz: Option<&str>) {
 }
 
 pub async fn standup(ctx: &Ctx, since: String, user: Option<String>) -> Result<()> {
+    if let Some(sessions) = ctx.multi_sessions().await? {
+        return standup_multi(ctx, &sessions, &since, user.as_deref()).await;
+    }
     let s = ctx.session().await?;
     let r = s.resolver()?;
     let out = ops::standup(&r, &since, user.as_deref()).await?;
@@ -101,6 +104,56 @@ pub async fn standup(ctx: &Ctx, since: String, user: Option<String>) -> Result<(
     section("In progress", &out.in_progress, tz);
     section("Due soon", &out.due_soon, tz);
     section("Overdue", &out.overdue, tz);
+    Ok(())
+}
+
+/// One standup per active workspace; a workspace that fails is skipped with
+/// a warning unless all of them fail.
+async fn standup_multi(
+    ctx: &Ctx,
+    sessions: &[(String, Session)],
+    since: &str,
+    user: Option<&str>,
+) -> Result<()> {
+    let mut outs = Vec::new();
+    let mut errors = Vec::new();
+    for (ws, s) in sessions {
+        match ops::standup(&s.resolver()?, since, user).await {
+            Ok(out) => outs.push((ws, s.tz(), out)),
+            Err(e) => {
+                eprintln!("warning: skipped workspace '{ws}': {e}");
+                errors.push(e);
+            }
+        }
+    }
+    if errors.len() == sessions.len() {
+        return Err(errors.remove(0).into());
+    }
+    if ctx.json {
+        let all = outs
+            .iter()
+            .map(|(ws, _, out)| {
+                let mut v = serde_json::to_value(out)?;
+                v["workspace"] = json!(ws);
+                Ok(v)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        return print_json(&all);
+    }
+    for (ws, tz, out) in &outs {
+        println!(
+            "# Standup — {} — {} (since {})",
+            ws,
+            out.user,
+            format_ms(out.since, *tz)
+        );
+        section("Done", &out.closed, *tz);
+        section("Updated", &out.updated, *tz);
+        section("In progress", &out.in_progress, *tz);
+        section("Due soon", &out.due_soon, *tz);
+        section("Overdue", &out.overdue, *tz);
+        println!();
+    }
     Ok(())
 }
 
