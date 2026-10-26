@@ -4,6 +4,7 @@ pub mod hierarchy;
 pub mod mcp;
 pub mod report;
 pub mod task;
+pub mod update;
 
 use std::{collections::HashMap, io::Read};
 
