@@ -155,6 +155,13 @@ The entry is named `clickupc`, so it coexists with ClickUp's official server. Wi
 
 ## Upgrade
 
+```bash
+clickupc update            # upgrade through the channel that installed clickupc
+clickupc update --check    # only report whether a newer release exists
+```
+
+`clickupc update` asks before it runs the command below for your channel (`--yes` skips the prompt). An install-script binary is reinstalled into its current directory.
+
 | Channel | Command |
 | --- | --- |
 | Install script | re-run the install command |

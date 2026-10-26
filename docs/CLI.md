@@ -208,6 +208,7 @@ clickupc api PUT /v3/workspaces/{workspace}/tasks/abc/home_list/456 --data @body
 clickupc config get|set <key> [value]               # default_task_limit, timezone, default_list, timeout_secs
 clickupc mcp serve [--transport stdio|streamable-http] [--host] [--port] [--path]   # run the MCP server
 clickupc mcp doctor                                 # check binary on PATH, token, workspace, a test call
+clickupc update [--check]                           # upgrade via brew/scoop/npm/cargo or the install script
 clickupc mcp install [--client <c>]… [--server-profile <p>]… [--name clickupc] [--dry-run] [--force]
     # No --client on a terminal: prerequisite checklist (runs `auth login` if needed), then checkbox
     # pickers for clients and, with several profiles, for profiles. One entry per client × profile:
