@@ -1,6 +1,6 @@
 {
   "name": "@mulham28/clickupc",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Unofficial ClickUp CLI and MCP server in one binary, installed from GitHub Releases",
   "license": "MIT",
   "repository": {

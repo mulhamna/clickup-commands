@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/mulhamna/clickup-commands/compare/v1.3.0...v1.4.0) (2026-10-26)
+
+
+### Features
+
+* **cli:** add update command to upgrade clickupc in place ([af7cc40](https://github.com/mulhamna/clickup-commands/commit/af7cc4042c3d907ec27066cc94ad0e8dc975876f))
+
+
+### Bug Fixes
+
+* **deps:** bump rustls-webpki and webpki-roots for RUSTSEC advisories ([ecf7473](https://github.com/mulhamna/clickup-commands/commit/ecf7473d029c31fdba6c1050ecaf1676f6352de7))
+* patch RUSTSEC advisories, add clickupc update, bump deps ([0454fb9](https://github.com/mulhamna/clickup-commands/commit/0454fb92272a656cb5aedbe757171c514b5d1fac))
+
 ## [1.3.0](https://github.com/mulhamna/clickup-commands/compare/v1.2.0...v1.3.0) (2026-10-15)
 
 
