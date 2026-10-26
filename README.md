@@ -175,6 +175,7 @@ clickupc api PUT "/v3/workspaces/{workspace}/tasks/abc/home_list/456" --data @bo
 | `config get \| set` | Profile settings |
 | `cache clear` | Drop cached hierarchy, members and fields |
 | `mcp serve \| install \| doctor` | MCP server |
+| `update [--check]` | Upgrade to the latest release |
 
 Full spec: [docs/CLI.md](docs/CLI.md).
 

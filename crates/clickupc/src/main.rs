@@ -139,6 +139,12 @@ enum Commands {
     /// MCP server: serve, install, doctor
     #[command(subcommand, long_about = help_text::MCP_LONG_ABOUT)]
     Mcp(McpCmd),
+    /// Upgrade clickupc to the latest release
+    Update {
+        /// Only report whether a newer release exists
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 async fn run(cli: Cli) -> Result<()> {
@@ -176,6 +182,7 @@ async fn run(cli: Cli) -> Result<()> {
         Commands::Doc(c) => report::doc(&ctx, c).await,
         Commands::Api { method, path, data } => report::api(&ctx, method, path, data).await,
         Commands::Mcp(c) => mcp::run(&ctx, c).await,
+        Commands::Update { check } => update::update(&ctx, check).await,
     }
 }
 
