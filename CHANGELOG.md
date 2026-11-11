@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.5.0](https://github.com/mulhamna/clickup-commands/compare/v1.4.0...v1.5.0) (2026-11-11)
+
+
+### Features
+
+* **cli:** add jcode and zcode targets to mcp install ([74baf2e](https://github.com/mulhamna/clickup-commands/commit/74baf2ec3438f16e10cb85fbe68e87f3a6878485))
+
+
+### Bug Fixes
+
+* resolve rmcp advisories and fold in dependency updates ([9273764](https://github.com/mulhamna/clickup-commands/commit/92737641cf19d81a714b178f6716239422325a2f))
+
+
+### Code Refactoring
+
+* **mcp:** use rmcp 3.9 ServerConfig and ClientConfig names ([cee56ea](https://github.com/mulhamna/clickup-commands/commit/cee56ea2f2c5191cde336fbb066952b9013d9778))
+
 ## [1.4.0](https://github.com/mulhamna/clickup-commands/compare/v1.3.0...v1.4.0) (2026-10-26)
 
 
