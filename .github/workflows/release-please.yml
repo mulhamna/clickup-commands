@@ -12,9 +12,10 @@ on:
     types: [closed]
     branches: [main]
 
+# Every step authenticates with RELEASE_PLEASE_TOKEN, so GITHUB_TOKEN
+# needs no write access.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: release-please-${{ github.ref }}
