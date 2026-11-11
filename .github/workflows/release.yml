@@ -251,11 +251,10 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
+          # Trusted publishing needs npm >= 11.5.1; Node 24 bundles it, so
+          # no unpinned `npm install -g npm@…` step is needed.
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-
-      # Trusted publishing needs npm >= 11.5.1.
-      - run: npm install -g npm@11.19.0
 
       - name: Publish (skip if already published)
         run: |
