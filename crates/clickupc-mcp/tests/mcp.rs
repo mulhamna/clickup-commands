@@ -3,7 +3,7 @@
 
 use clickupc_mcp::ClickUpMcpServer;
 use rmcp::{
-    model::{CallToolRequestParams, ClientCapabilities, ClientInfo, Implementation},
+    model::{CallToolRequestParams, ClientCapabilities, ClientConfig, Implementation},
     service::{RoleClient, RunningService},
     transport::{
         streamable_http_server::{
@@ -240,7 +240,7 @@ async fn streamable_http_transport() {
             .await
             .unwrap();
     });
-    let client = ClientInfo::new(
+    let client = ClientConfig::new(
         ClientCapabilities::default(),
         Implementation::new("test", "0.1.0"),
     )
